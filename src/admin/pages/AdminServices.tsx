@@ -63,6 +63,14 @@ const SortableServiceItem: React.FC<{
         {service.visibility_status === 'visible' ? 'Visible' :
          service.visibility_status === 'coming_soon' ? 'Coming Soon' : 'Hidden'}
       </div>
+      {/* Brand badge */}
+      <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${
+        service.brand === 'skylum'
+          ? 'bg-blue-100 text-blue-700'
+          : 'bg-teal-100 text-teal-700'
+      }`}>
+        {service.brand || 'hwood'}
+      </span>
       <div className="w-6 h-6 rounded-full border-2 border-white shadow" style={{ backgroundColor: service.accent_color || '#005f5f' }} />
       <div className="flex items-center gap-2">
         <button onClick={onEdit} className="p-2 text-gray-500 hover:text-[#005f5f] hover:bg-[#005f5f]/10 rounded-lg transition-colors">
@@ -100,6 +108,8 @@ const [formData, setFormData] = useState<{
     hero_image_url: string;
     accent_color: string;
     visibility_status: VisibilityStatus;
+    brand: 'hwood' | 'skylum';
+    order_type: string;
   }>({
     slug: '',
     title_en: '',
@@ -114,6 +124,8 @@ const [formData, setFormData] = useState<{
     hero_image_url: '',
     accent_color: '#005f5f',
     visibility_status: 'visible',
+    brand: 'hwood',
+    order_type: 'browse-and-order',
   });
 
   const loadServices = async () => {
@@ -147,6 +159,8 @@ const [formData, setFormData] = useState<{
       hero_image_url: '',
       accent_color: '#005f5f',
       visibility_status: 'visible',
+      brand: 'hwood',
+      order_type: 'browse-and-order',
     });
     setIsModalOpen(true);
   };
@@ -167,6 +181,8 @@ const [formData, setFormData] = useState<{
       hero_image_url: service.hero_image_url || '',
       accent_color: service.accent_color || '#005f5f',
       visibility_status: service.visibility_status,
+      brand: service.brand || 'hwood',
+      order_type: service.order_type || 'browse-and-order',
     });
     setIsModalOpen(true);
   };
@@ -216,27 +232,29 @@ const [formData, setFormData] = useState<{
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#005f5f]" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
+        <div style={{ width: 24, height: 24, border: '2px solid var(--border-1)', borderTopColor: 'var(--brand)', borderRadius: 999, animation: 'spin 0.8s linear infinite' }} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Services</h2>
-          <p className="text-gray-500">Manage your top-level service categories</p>
+          <h2 style={{ fontSize: 17, fontWeight: 600, color: 'var(--fg-1)', letterSpacing: '-0.01em', margin: 0 }}>Services</h2>
+          <p style={{ fontSize: 12, color: 'var(--fg-3)', marginTop: 3 }}>Manage service pages and their visibility</p>
         </div>
-        <button
-          onClick={openNewModal}
-          className="flex items-center gap-2 px-4 py-2 bg-[#005f5f] text-white rounded-lg hover:bg-[#004d4d] transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Add Service
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            onClick={openNewModal}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: 'none', background: 'var(--brand)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+          >
+            <Plus className="w-4 h-4" />
+            Add Service
+          </button>
+        </div>
       </div>
 
       {/* Services List */}
@@ -404,6 +422,39 @@ const [formData, setFormData] = useState<{
                 placeholder="#005f5f"
               />
             </div>
+          </div>
+
+          {/* Brand */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
+            <div className="flex gap-3">
+              {(['hwood', 'skylum'] as const).map(b => (
+                <button key={b} type="button"
+                  onClick={() => setFormData({ ...formData, brand: b })}
+                  className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                    formData.brand === b
+                      ? 'border-[#005f5f] bg-[#005f5f]/10 text-[#005f5f]'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}>
+                  {b === 'skylum' ? 'Skylum' : 'HWOOD'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Order Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Order Type</label>
+            <select
+              value={formData.order_type}
+              onChange={e => setFormData({ ...formData, order_type: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005f5f] focus:border-transparent outline-none"
+            >
+              <option value="browse-and-order">Browse &amp; Order</option>
+              <option value="send-file-and-process">Send File &amp; Process</option>
+              <option value="describe-and-request">Describe &amp; Request</option>
+              <option value="informational">Informational</option>
+            </select>
           </div>
 
           {/* Visibility */}

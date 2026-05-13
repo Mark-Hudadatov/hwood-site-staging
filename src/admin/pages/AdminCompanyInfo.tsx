@@ -110,37 +110,35 @@ export const AdminCompanyInfo: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#005f5f]" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
+        <div style={{ width: 24, height: 24, border: '2px solid var(--border-1)', borderTopColor: 'var(--brand)', borderRadius: 999, animation: 'spin 0.8s linear infinite' }} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 800 }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Company Info</h2>
-          <p className="text-gray-500">Edit your company details displayed on the website</p>
+          <h2 style={{ fontSize: 17, fontWeight: 600, color: 'var(--fg-1)', letterSpacing: '-0.01em', margin: 0 }}>Company Info</h2>
+          <p style={{ fontSize: 12, color: 'var(--fg-3)', marginTop: 3 }}>Edit your company details displayed on the website</p>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-            saved 
-              ? 'bg-green-500 text-white' 
-              : 'bg-[#005f5f] text-white hover:bg-[#004d4d]'
-          } disabled:opacity-50`}
-        >
-          <Save className="w-4 h-4" />
-          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Changes'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: 'none', background: saved ? '#15803d' : 'var(--brand)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+          >
+            <Save className="w-4 h-4" />
+            {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Changes'}
+          </button>
+        </div>
       </div>
 
       {/* Company Details */}
       <div className="bg-white rounded-xl shadow-sm p-6 space-y-6">
-        <h3 className="text-lg font-semibold text-gray-900 border-b pb-3">Company Details</h3>
+        <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: '0.1em', paddingBottom: 10, borderBottom: '1px solid var(--border-1)', marginBottom: 0 }}>Company Details</h3>
         
         <BilingualInput
           label="Company Name"
@@ -179,7 +177,7 @@ export const AdminCompanyInfo: React.FC = () => {
 
       {/* Contact Info */}
       <div className="bg-white rounded-xl shadow-sm p-6 space-y-6">
-        <h3 className="text-lg font-semibold text-gray-900 border-b pb-3">Contact Information</h3>
+        <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: '0.1em', paddingBottom: 10, borderBottom: '1px solid var(--border-1)', marginBottom: 0 }}>Contact Information</h3>
         
         <div className="grid grid-cols-2 gap-6">
           <div>
@@ -217,7 +215,7 @@ export const AdminCompanyInfo: React.FC = () => {
 
       {/* Social Media */}
       <div className="bg-white rounded-xl shadow-sm p-6 space-y-6">
-        <h3 className="text-lg font-semibold text-gray-900 border-b pb-3">Social Media Links</h3>
+        <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: '0.1em', paddingBottom: 10, borderBottom: '1px solid var(--border-1)', marginBottom: 0 }}>Social Media Links</h3>
         <p className="text-sm text-gray-500">Add URLs for each platform. Toggle visibility to show/hide on website.</p>
         
         <div className="space-y-4">

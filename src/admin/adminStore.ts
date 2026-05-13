@@ -28,6 +28,8 @@ export interface AdminService {
   accent_color?: string;
   visibility_status: VisibilityStatus;
   sort_order: number;
+  brand?: 'hwood' | 'skylum';
+  order_type?: string;
   created_at?: string;
   updated_at?: string;
 }

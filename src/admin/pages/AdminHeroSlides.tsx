@@ -132,28 +132,30 @@ export const AdminHeroSlides: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#005f5f]" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
+        <div style={{ width: 24, height: 24, border: '2px solid var(--border-1)', borderTopColor: 'var(--brand)', borderRadius: 999, animation: 'spin 0.8s linear infinite' }} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Hero Slides</h2>
-          <p className="text-gray-500">Homepage hero carousel (max 3 slides)</p>
+          <h2 style={{ fontSize: 17, fontWeight: 600, color: 'var(--fg-1)', letterSpacing: '-0.01em', margin: 0 }}>Hero Slides</h2>
+          <p style={{ fontSize: 12, color: 'var(--fg-3)', marginTop: 3 }}>Homepage hero carousel (max 3 slides)</p>
         </div>
-        <button
-          onClick={openNewModal}
-          disabled={slides.length >= 3}
-          className="flex items-center gap-2 px-4 py-2 bg-[#005f5f] text-white rounded-lg hover:bg-[#004d4d] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Plus className="w-5 h-5" />
-          Add Slide ({slides.length}/3)
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            onClick={openNewModal}
+            disabled={slides.length >= 3}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: 'none', background: 'var(--brand)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: slides.length >= 3 ? 'not-allowed' : 'pointer', opacity: slides.length >= 3 ? 0.5 : 1 }}
+          >
+            <Plus className="w-4 h-4" />
+            Add Slide ({slides.length}/3)
+          </button>
+        </div>
       </div>
 
       {/* Info */}

@@ -1,22 +1,19 @@
 /**
- * MAIN LAYOUT - FIXED
- * ===================
- * FIXES:
- * ✅ WhatsApp button (bottom right, green)
- * ✅ One language button only
- * ✅ User icon → /login
- * ✅ ScrollToTop on route change
- * ✅ Language switch reloads page
+ * MAIN LAYOUT
  */
 
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Globe, Facebook, Instagram, Linkedin, Youtube, Menu, X } from 'lucide-react';
+import { Facebook, Instagram, Linkedin, Youtube, MessageCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
+import { getCompanyInfo } from '../services/data/dataService';
+import { getOrderTypeConfig, BRAND_NEUTRAL } from '../lib/OrderTypes';
+import type { ServiceOrderType } from '../lib/OrderTypes';
 
 // Premium Components
 import { LoadingScreen, PageTransition } from '../components/premium';
+import { CookieBanner } from '../components/CookieBanner';
 
 // WhatsApp Icon
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -34,161 +31,199 @@ const ScrollToTop: React.FC = () => {
   return null;
 };
 
-// Language Switcher
-const LanguageSwitcher: React.FC<{ variant?: 'light' | 'dark' }> = ({ variant = 'dark' }) => {
+// ── TopBar ───────────────────────────────────────────────────────────────────
+const TopBar: React.FC<{ phone: string; email: string }> = ({ phone, email }) => {
   const { i18n } = useTranslation();
-  const currentLang = i18n.language?.startsWith('he') ? 'he' : 'en';
-  
-  const toggleLanguage = () => {
-    const newLang = currentLang === 'en' ? 'he' : 'en';
-    localStorage.setItem('i18nextLng', newLang);
-    i18n.changeLanguage(newLang).then(() => window.location.reload());
-  };
-  
-  const baseClasses = "flex items-center gap-1.5 border rounded-full px-3 py-1.5 transition-all font-medium text-[11px]";
-  const variantClasses = variant === 'light' 
-    ? "border-white/50 text-white hover:bg-white/20" 
-    : "border-neutral-400 text-neutral-800 hover:bg-white hover:border-transparent";
-  
+  const isHe = i18n.language?.startsWith('he');
+
   return (
-    <button onClick={toggleLanguage} className={`${baseClasses} ${variantClasses}`} aria-label="Switch language">
-      <Globe className="w-3.5 h-3.5" />
-      <span>{currentLang === 'en' ? 'עברית' : 'English'}</span>
-    </button>
+    <div style={{ position: 'sticky', top: 0, zIndex: 50, background: '#002828', color: 'rgba(255,255,255,0.78)', fontSize: 11.5, overflow: 'hidden' }}>
+      {/* Diagonal teal stripes */}
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+        <span style={{ position: 'absolute', top: '-50%', left: '-3rem', width: '8rem', height: '200%', transform: 'skewX(-20deg)', background: '#005f5f', opacity: 0.5 }} />
+        <span style={{ position: 'absolute', top: '-50%', left: '4rem', width: '4rem', height: '200%', transform: 'skewX(-20deg)', background: '#004d4d', opacity: 0.45 }} />
+      </div>
+
+      <div style={{ position: 'relative', zIndex: 1, padding: '7px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20 }}>
+        {/* Left: status + contact */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 7, height: 7, borderRadius: 99, background: '#00d4aa', boxShadow: '0 0 9px #00d4aa', flexShrink: 0 }} />
+            <span style={{ fontWeight: 600, color: '#fff' }}>
+              {isHe ? 'פעיל לייצור' : 'Production active'}
+            </span>
+            <span style={{ color: 'rgba(255,255,255,0.4)' }}>·</span>
+            <span style={{ color: 'rgba(255,255,255,0.6)' }}>
+              {isHe ? 'נתניה · אא–הי 9:00–18:00' : 'Netanya · 9:00 — 18:00 IST'}
+            </span>
+          </span>
+          {(phone || email) && (
+            <span style={{ width: 1, height: 13, background: 'rgba(255,255,255,0.18)', flexShrink: 0 }} />
+          )}
+          {phone && (
+            <a href={`tel:${phone}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.85)', textDecoration: 'none', fontWeight: 500 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+              {phone}
+            </a>
+          )}
+          {email && (
+            <a href={`mailto:${email}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.7)', textDecoration: 'none' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+              </svg>
+              {email}
+            </a>
+          )}
+        </div>
+
+        {/* Right: language toggle */}
+        <button
+          onClick={() => i18n.changeLanguage(isHe ? 'en' : 'he')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', border: '1px solid rgba(255,255,255,0.22)', color: '#fff', borderRadius: 999, padding: '4px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          {isHe ? 'English' : 'עברית'}
+        </button>
+      </div>
+    </div>
   );
 };
 
-// Order types — anchor to #services
-const ORDER_TYPES = [
-  { label: 'Catalog Order',  labelHe: 'הזמנה מקטלוג' },
-  { label: 'Project Order',  labelHe: 'הזמנת פרויקט'  },
-  { label: 'Custom Order',   labelHe: 'הזמנה מותאמת'  },
-];
-
-// Header Component
+// ── Header ───────────────────────────────────────────────────────────────────
 const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { i18n } = useTranslation();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const lang = i18n.language?.startsWith('he') ? 'he' : 'en';
+  const isHe = i18n.language?.startsWith('he');
+  const [contact, setContact] = useState({ phone: '', email: '' });
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleOrderTypeClick = () => {
-    if (location.pathname === '/') {
-      document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      navigate('/#services');
-    }
-    setMobileMenuOpen(false);
-  };
+  useEffect(() => {
+    getCompanyInfo().then(info => {
+      if (info) setContact({ phone: info.phone || '', email: info.email || '' });
+    });
+  }, []);
+
+  const navLinks = [
+    { label: isHe ? 'אודות' : 'About',        sub: isHe ? 'הצוות והמפעל'      : 'Workshop & team',    path: '/about'     },
+    { label: isHe ? 'פרויקטים' : 'Portfolio',  sub: isHe ? 'פרויקטים אחרונים'  : 'Recent projects',    path: '/portfolio' },
+  ];
+
+  const isActive = (path: string) => location.pathname === path;
 
   return (
-    <header className="w-full bg-[#EAEAEA] relative z-20 shadow-sm font-sans">
+    <header style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.08)', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <TopBar phone={contact.phone} email={contact.email} />
 
-      {/* ── Single row ── */}
-      <nav className="w-full px-4 md:px-8 flex items-center justify-between gap-4">
+      <div style={{ display: 'flex', alignItems: 'stretch', minHeight: 72 }}>
 
-        {/* LEFT: HWOOD logo */}
-        <div className="cursor-pointer flex-shrink-0 py-3" onClick={() => navigate('/')}>
-          <img
-            src="/logo.png"
-            alt="HWOOD"
-            className="h-10 md:h-11 w-auto object-contain"
-            style={{ maxWidth: '150px', minWidth: '80px' }}
-          />
-        </div>
+        {/* Logo */}
+        <a onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', padding: '10px 24px', borderRight: '1px solid #efefef', cursor: 'pointer', flexShrink: 0, textDecoration: 'none' }}>
+          <img src="/logo.png" alt="HWOOD" style={{ height: 44, width: 'auto', maxWidth: 150 }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        </a>
 
-        {/* CENTER: Order types + nav links — desktop */}
-        <div className="hidden lg:flex items-center gap-0 flex-1 justify-center">
-          {ORDER_TYPES.map((type, idx) => (
-            <button
-              key={idx}
-              onClick={handleOrderTypeClick}
-              className="px-4 xl:px-5 py-4 text-meta-sm font-medium text-brand hover:text-white hover:bg-brand transition-all duration-200 tracking-wide uppercase whitespace-nowrap"
+        {/* Nav — desktop */}
+        <nav className="hidden lg:flex" style={{ flex: 1, alignItems: 'stretch', padding: '0 8px', display: 'flex' }}>
+          {navLinks.map(link => (
+            <a
+              key={link.path}
+              onClick={() => navigate(link.path)}
+              style={{
+                display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                padding: '0 20px', cursor: 'pointer', textDecoration: 'none',
+                borderBottom: isActive(link.path) ? '2px solid #005f5f' : '2px solid transparent',
+                marginBottom: -1, transition: 'border-color 0.15s',
+              }}
             >
-              {lang === 'he' ? type.labelHe : type.label}
-            </button>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: isActive(link.path) ? '#005f5f' : '#0a0a0a' }}>
+                {link.label}
+              </span>
+              <span style={{ fontSize: 10, color: '#a3a3a3', marginTop: 2 }}>{link.sub}</span>
+            </a>
           ))}
+        </nav>
 
-          <div className="w-px h-5 bg-neutral-300 mx-3" />
+        {/* Spacer on mobile */}
+        <div className="lg:hidden" style={{ flex: 1 }} />
 
-          <Link to="/portfolio" className="px-4 xl:px-5 py-4 text-meta-sm font-medium text-neutral-600 hover:text-brand transition-colors tracking-wide uppercase whitespace-nowrap">Portfolio</Link>
-          <Link to="/about"     className="px-4 xl:px-5 py-4 text-meta-sm font-medium text-neutral-600 hover:text-brand transition-colors tracking-wide uppercase whitespace-nowrap">About</Link>
-          <Link to="/contact"   className="px-4 xl:px-5 py-4 text-meta-sm font-medium text-neutral-600 hover:text-brand transition-colors tracking-wide uppercase whitespace-nowrap">Contact</Link>
-        </div>
-
-        {/* RIGHT: Skylum + Language + Mobile toggle */}
-        <div className="flex items-center gap-3 flex-shrink-0">
-
-          {/* Skylum partner brand — desktop only */}
-          <a
-            href="https://skylum.co.il"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden md:flex flex-col items-end group py-2"
-            title="Skylum — Building Cladding & Facades"
-          >
-            <span className="text-[8px] font-medium text-neutral-400 uppercase tracking-widest leading-none mb-1">
-              Part of Skylum Group
-            </span>
-            <img
-              src="https://skylum.co.il/wp-content/uploads/2023/08/IMG_0812.png"
-              alt="Skylum"
-              className="h-8 w-auto object-contain opacity-60 group-hover:opacity-100 transition-opacity duration-300"
-              style={{ maxWidth: '100px' }}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-          </a>
-
-          <div className="hidden md:block w-px h-8 bg-neutral-300" />
-
-          <LanguageSwitcher variant="dark" />
-
-          {/* Mobile hamburger */}
+        {/* Get a quote CTA */}
+        <div style={{ display: 'flex', alignItems: 'center', padding: '0 20px', borderLeft: '1px solid #efefef', flexShrink: 0 }}>
           <button
-            className="lg:hidden w-10 h-10 rounded-full bg-white flex items-center justify-center text-black shadow-sm"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            onClick={() => navigate('/quote')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#005f5f', color: '#fff', border: 0, padding: '10px 20px', borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', cursor: 'pointer', boxShadow: '0 4px 14px -4px rgba(0,95,95,0.5)', whiteSpace: 'nowrap' }}
           >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {isHe ? 'קבל הצעת מחיר' : 'Get a quote'}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M13 5l7 7-7 7"/>
+            </svg>
           </button>
         </div>
-      </nav>
 
-      {/* ── Mobile Menu ── */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden bg-white border-t border-neutral-200 shadow-lg absolute top-full left-0 right-0 z-50">
-          <div className="px-4 py-4 space-y-1">
-            <p className="px-4 pt-2 pb-1 text-[10px] font-medium text-neutral-400 uppercase tracking-widest">How to order</p>
-            {ORDER_TYPES.map((type, idx) => (
-              <button
-                key={idx}
-                onClick={handleOrderTypeClick}
-                className="w-full text-left px-4 py-3 text-base font-medium text-brand hover:bg-teal-50 rounded-lg"
-              >
-                {lang === 'he' ? type.labelHe : type.label}
-              </button>
-            ))}
-            <div className="border-t border-neutral-100 pt-3 mt-3 space-y-1">
-              <Link to="/portfolio" className="block px-4 py-2 text-neutral-700 hover:bg-neutral-50 rounded-lg" onClick={() => setMobileMenuOpen(false)}>Portfolio</Link>
-              <Link to="/about"     className="block px-4 py-2 text-neutral-700 hover:bg-neutral-50 rounded-lg" onClick={() => setMobileMenuOpen(false)}>About</Link>
-              <Link to="/contact"   className="block px-4 py-2 text-neutral-700 hover:bg-neutral-50 rounded-lg" onClick={() => setMobileMenuOpen(false)}>Contact</Link>
-            </div>
-            <div className="border-t border-neutral-100 pt-3 mt-1">
-              <a
-                href="https://skylum.co.il"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-sky-50"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <img
-                  src="https://skylum.co.il/wp-content/uploads/2023/08/IMG_0812.png"
-                  alt="Skylum"
-                  className="h-5 w-auto object-contain opacity-70"
-                />
-                <span className="text-meta-sm text-neutral-500 font-medium">Building Cladding & Facades ↗</span>
-              </a>
-            </div>
+        {/* Skylum notched panel — desktop only */}
+        <aside
+          onClick={() => window.open('https://skylum.co.il', '_blank')}
+          className="hidden md:flex"
+          style={{ position: 'relative', minWidth: 210, flexShrink: 0, padding: '10px 20px 10px 36px', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 3, background: '#f0f0ee', clipPath: 'polygon(22px 0%, 100% 0%, 100% 100%, 0% 100%)', cursor: 'pointer' }}
+        >
+          <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.26em', textTransform: 'uppercase', color: '#888', whiteSpace: 'nowrap' }}>
+            {isHe ? 'חלק מ-Skylum Group' : 'Part of Skylum Group'}
+          </span>
+          <img src="/logo-skylum.png" alt="SKYLUM" style={{ height: 26, width: 'auto', maxWidth: 130 }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+              const el = document.createElement('span');
+              el.textContent = 'SKYLUM';
+              el.style.cssText = 'font-size:15px;font-weight:800;color:#14225C;letter-spacing:0.06em';
+              (e.target as HTMLImageElement).parentNode?.appendChild(el);
+            }} />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#0091DB', whiteSpace: 'nowrap' }}>
+            {isHe ? 'בקר ב-Skylum' : 'Visit Skylum'}
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M13 5l7 7-7 7"/>
+            </svg>
+          </span>
+        </aside>
+
+        {/* Mobile hamburger */}
+        <button
+          className="lg:hidden"
+          onClick={() => setMobileOpen(!mobileOpen)}
+          style={{ border: 'none', background: 'transparent', cursor: 'pointer', alignItems: 'center', justifyContent: 'center', width: 48, borderLeft: '1px solid #efefef', flexShrink: 0 }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="2" strokeLinecap="round">
+            {mobileOpen
+              ? <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
+              : <><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></>
+            }
+          </svg>
+        </button>
+      </div>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div style={{ background: '#fff', borderTop: '1px solid #f0f0f0', padding: '12px 0' }}>
+          {[...navLinks, { label: isHe ? 'צור קשר' : 'Contact', sub: '', path: '/contact' }].map(link => (
+            <a
+              key={link.path}
+              onClick={() => { navigate(link.path); setMobileOpen(false); }}
+              style={{ display: 'block', padding: '10px 24px', fontSize: 14, fontWeight: 600, color: '#0a0a0a', cursor: 'pointer', textDecoration: 'none' }}
+            >
+              {link.label}
+            </a>
+          ))}
+          <div style={{ padding: '10px 24px' }}>
+            <button
+              onClick={() => { navigate('/quote'); setMobileOpen(false); }}
+              style={{ background: '#005f5f', color: '#fff', border: 0, borderRadius: 999, padding: '10px 20px', fontSize: 12, fontWeight: 700, width: '100%', cursor: 'pointer' }}
+            >
+              {isHe ? 'קבל הצעת מחיר' : 'Get a quote'}
+            </button>
           </div>
         </div>
       )}
@@ -196,113 +231,276 @@ const Header: React.FC = () => {
   );
 };
 
-// Footer Component
+// ── Footer ───────────────────────────────────────────────────────────────────
 const Footer: React.FC = () => {
-  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { i18n } = useTranslation();
   const isHe = i18n.language?.startsWith('he');
+  const [company, setCompany] = useState<{ name: string; phone: string; email: string; address: string; description: string } | null>(null);
   const [socialLinks, setSocialLinks] = useState<{ platform: string; url: string }[]>([]);
-  
+
   useEffect(() => {
-    supabase.from('social_links').select('*').eq('is_visible', true).order('sort_order')
-      .then(({ data }) => {
-        if (data) setSocialLinks(data.filter((l: any) => l.url).map((l: any) => ({ platform: l.platform, url: l.url })));
-      });
+    getCompanyInfo().then(info => {
+      if (info) setCompany({ name: info.name || 'HWOOD', phone: info.phone || '', email: info.email || '', address: info.address || '', description: info.description || '' });
+    });
+    supabase.from('social_links').select('*').eq('is_visible', true).order('sort_order').then(({ data }) => {
+      if (data) setSocialLinks(data.filter((l: any) => l.url).map((l: any) => ({ platform: l.platform, url: l.url })));
+    });
   }, []);
 
-  const platformIcon = (platform: string) => {
+  const SocialIcon: React.FC<{ platform: string }> = ({ platform }) => {
     switch (platform.toLowerCase()) {
-      case 'facebook': return Facebook;
-      case 'instagram': return Instagram;
-      case 'linkedin': return Linkedin;
-      case 'youtube': return Youtube;
-      default: return null;
+      case 'facebook':  return <Facebook className="w-4 h-4" />;
+      case 'instagram': return <Instagram className="w-4 h-4" />;
+      case 'linkedin':  return <Linkedin className="w-4 h-4" />;
+      case 'youtube':   return <Youtube className="w-4 h-4" />;
+      case 'whatsapp':  return <MessageCircle className="w-4 h-4" />;
+      default:          return null;
     }
   };
-  
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-  
-  return (
-    <footer className="w-full px-6 md:px-12 lg:px-20 xl:px-32 2xl:px-40 pt-12 md:pt-16 pb-8 text-white relative z-10">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 md:mb-16 gap-6 md:gap-8">
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="HWOOD Logo" className="h-10 w-auto brightness-0 invert object-contain" style={{ maxWidth: '140px' }} />
-        </div>
 
-        <div className="flex gap-4">
-          {socialLinks.length > 0 ? (
-            socialLinks.map((link) => {
-              const Icon = platformIcon(link.platform);
-              if (!Icon) return null;
-              return (
-                <a key={link.platform} href={link.url} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full border border-white/30 flex items-center justify-center hover:bg-white hover:text-neutral-900 transition-colors">
-                  <Icon className="w-5 h-5" />
-                </a>
-              );
-            })
-          ) : (
-            [Facebook, Instagram, Linkedin, Youtube].map((Icon, idx) => (
-              <a key={idx} href="#" className="w-10 h-10 rounded-full border border-white/30 flex items-center justify-center hover:bg-white hover:text-neutral-900 transition-colors">
-                <Icon className="w-5 h-5" />
-              </a>
-            ))
+  const footerCols = [
+    {
+      heading: isHe ? 'הזמנה' : 'Order',
+      accent: undefined as string | undefined,
+      links: [
+        { label: isHe ? 'הזמנה מקטלוג'     : 'Catalog Order',   path: '/quote?type=browse',    external: undefined, accent: false },
+        { label: isHe ? 'הזמנת פרויקט'     : 'Project Order',   path: '/quote?type=file',      external: undefined, accent: false },
+        { label: isHe ? 'הזמנה מותאמת'     : 'Custom Order',    path: '/quote?type=describe',  external: undefined, accent: false },
+        { label: isHe ? 'בקשת הצעת מחיר'  : 'Request a Quote', path: '/quote',                external: undefined, accent: false },
+      ],
+    },
+    {
+      heading: 'Skylum',
+      accent: '#0091DB' as string | undefined,
+      links: [
+        { label: isHe ? 'אודות סקיילום'   : 'About Skylum',     path: undefined, external: 'https://skylum.co.il', accent: false },
+        { label: isHe ? 'מערכות חזית'     : 'Facade Systems',   path: '/services/facade-systems-acp', external: undefined, accent: false },
+        { label: isHe ? 'אספקת ACP ו-HPL' : 'ACP & HPL Supply', path: '/services/materials-panel-supply', external: undefined, accent: false },
+        { label: isHe ? 'בקר Skylum ←'   : 'Visit Skylum →',   path: undefined, external: 'https://skylum.co.il', accent: true },
+      ],
+    },
+    {
+      heading: isHe ? 'החברה' : 'Company',
+      accent: undefined as string | undefined,
+      links: [
+        { label: isHe ? 'אודות'      : 'About',     path: '/about',     external: undefined, accent: false },
+        { label: isHe ? 'פרויקטים'  : 'Portfolio',  path: '/portfolio', external: undefined, accent: false },
+        { label: isHe ? 'צור קשר'   : 'Contact',    path: '/contact',   external: undefined, accent: false },
+      ],
+    },
+  ];
+
+  const iconStyle: React.CSSProperties = { width: 36, height: 36, borderRadius: 99, border: '1px solid rgba(255,255,255,0.2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.85)', textDecoration: 'none', cursor: 'pointer', flexShrink: 0 };
+
+  return (
+    <footer style={{ position: 'relative', background: '#002828', color: '#fff', overflow: 'hidden', fontFamily: 'Inter, system-ui, sans-serif' }}>
+
+      {/* Diagonal teal stripes */}
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+        <span style={{ position: 'absolute', top: '-40%', left: '-4rem', width: '14rem', height: '200%', transform: 'skewX(-20deg)', background: '#005f5f', opacity: 0.5 }} />
+        <span style={{ position: 'absolute', top: '-40%', left: '7rem', width: '8rem', height: '200%', transform: 'skewX(-20deg)', background: '#004d4d', opacity: 0.38 }} />
+      </div>
+
+      {/* GET IN TOUCH */}
+      <div style={{ position: 'relative', zIndex: 2, padding: '52px 64px 32px', display: 'grid', gridTemplateColumns: '1fr auto', gap: 48, alignItems: 'end', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div>
+          <span style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#00d4aa', marginBottom: 12 }}>
+            {isHe ? 'צור קשר' : 'Get in touch'}
+          </span>
+          <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 2.6rem)', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, margin: 0, maxWidth: 680, color: '#fff' }}>
+            {isHe
+              ? 'שלח בריף, DXF, או שאלה. אנחנו עונים תוך יום עסקים.'
+              : 'Send a brief, a DXF, or a question. We reply within one business day.'}
+          </h2>
+        </div>
+        <div style={{ display: 'flex', gap: 12, flexShrink: 0, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            onClick={() => navigate('/quote')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#fff', color: '#002828', border: 0, padding: '13px 24px', borderRadius: 999, fontSize: 12, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            {isHe ? 'התחל הזמנה' : 'Start an order'}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </button>
+          {company?.email && (
+            <a
+              href={`mailto:${company.email}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.28)', padding: '12px 22px', borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', whiteSpace: 'nowrap' }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              {isHe ? 'שלח אימייל' : 'Email order desk'}
+            </a>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 lg:gap-20 xl:gap-24 mb-10 md:mb-16">
+      {/* MAIN GRID */}
+      <div style={{ position: 'relative', zIndex: 2, padding: '48px 64px 32px', display: 'grid', gridTemplateColumns: '1.6fr 1fr 1fr 1fr', gap: 48 }}>
+        {/* Brand column */}
         <div>
-          <h3 className="text-body-lg font-medium mb-4">{isHe ? 'עדכונים' : 'Updates'}</h3>
-          <div className="w-full h-px bg-neutral-600 mb-6" />
-          <p className="mb-8 text-meta text-neutral-400 leading-relaxed max-w-md">{isHe ? 'עדכונים טכניים, תובנות ייצור ושינויים במערכת.' : 'Technical updates, production insights, and system changes.'}</p>
-          <button onClick={() => navigate('/contact')} className="bg-white text-neutral-900 px-8 py-3 rounded font-medium hover:bg-neutral-200 transition-colors">{isHe ? 'הרשמה' : 'Subscribe'}</button>
+          <img src="/logo.png" alt="HWOOD" style={{ height: 42, width: 'auto', filter: 'brightness(0) invert(1)', marginBottom: 20 }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          {company?.description && (
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.62)', fontWeight: 300, lineHeight: 1.65, marginBottom: 20, maxWidth: 320 }}>{company.description}</p>
+          )}
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 20 }}>
+            {company?.address && (
+              <li style={{ display: 'inline-flex', alignItems: 'flex-start', gap: 9, fontSize: 13, color: 'rgba(255,255,255,0.72)', fontWeight: 300 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                {company.address}
+              </li>
+            )}
+            {company?.phone && (
+              <li>
+                <a href={`tel:${company.phone}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontSize: 13, color: 'rgba(255,255,255,0.72)', fontWeight: 300, textDecoration: 'none' }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                  {company.phone}
+                </a>
+              </li>
+            )}
+            {company?.email && (
+              <li>
+                <a href={`mailto:${company.email}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontSize: 13, color: 'rgba(255,255,255,0.72)', fontWeight: 300, textDecoration: 'none' }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  {company.email}
+                </a>
+              </li>
+            )}
+            <li style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontSize: 13, color: 'rgba(255,255,255,0.72)', fontWeight: 300 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              {isHe ? 'אי–הי · 9:00–18:00' : 'Sun – Thu · 9:00 – 18:00 IST'}
+            </li>
+          </ul>
+          {socialLinks.length > 0 && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {socialLinks.map(l => (
+                <a key={l.platform} href={l.url} target="_blank" rel="noopener noreferrer" style={iconStyle}>
+                  <SocialIcon platform={l.platform} />
+                </a>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div>
-          <h3 className="text-body-lg font-medium mb-4">{isHe ? 'תמיכה טכנית' : 'Technical Support'}</h3>
-          <div className="w-full h-px bg-brand mb-6" />
-          <p className="mb-8 text-meta text-neutral-400 leading-relaxed max-w-md">{isHe ? 'תמיכה לאחר אספקה עבור מערכות ייצור, רכיבים ותהליכי CNC.' : 'Post-delivery support for production systems, components, and CNC workflows.'}</p>
-          <button onClick={() => navigate('/contact')} className="bg-brand text-white px-8 py-3 rounded font-medium hover:bg-teal-600 transition-colors">{isHe ? 'בקשת תמיכה' : 'Request Support'}</button>
-        </div>
+        {/* Nav columns */}
+        {footerCols.map(col => (
+          <div key={col.heading}>
+            <span style={{ display: 'block', fontSize: 9, fontWeight: 700, letterSpacing: '0.26em', textTransform: 'uppercase', marginBottom: 18, color: col.accent || 'rgba(255,255,255,0.4)' }}>
+              {col.heading}
+            </span>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 11 }}>
+              {col.links.map((link) => (
+                <li key={link.label}>
+                  {link.external
+                    ? (
+                      <a href={link.external} target="_blank" rel="noopener noreferrer" style={{ fontSize: 14, color: link.accent ? '#7FC9FF' : 'rgba(255,255,255,0.8)', fontWeight: 300, textDecoration: 'none', cursor: 'pointer' }}>
+                        {link.label}
+                      </a>
+                    ) : (
+                      <a onClick={() => link.path && navigate(link.path)} style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', fontWeight: 300, cursor: 'pointer', textDecoration: 'none' }}>
+                        {link.label}
+                      </a>
+                    )
+                  }
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
 
-      {/* Back to Top Button - larger, above copyright */}
-      <div className="flex justify-center mb-8">
-        <button 
-          onClick={scrollToTop}
-          className="flex items-center gap-2 px-6 py-3 rounded-full border border-white/30 text-white/70 hover:bg-white hover:text-neutral-900 transition-all group"
+      {/* SKYLUM LOCKUP + BACK TO TOP */}
+      <div style={{ position: 'relative', zIndex: 2, padding: '28px 64px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 24 }}>
+        {/* Left: Skylum parent */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'flex-end' }}>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.38)', display: 'block', marginBottom: 4 }}>
+              {isHe ? 'חלק מ' : 'Part of'}
+            </span>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: 300 }}>
+              <strong style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>SKYLUM Ltd</strong>
+              {' · '}{isHe ? 'בנייה ואיקלום' : 'Quality facade building'}
+            </span>
+          </div>
+          <img src="/logo-skylum.png" alt="SKYLUM" style={{ height: 34, width: 'auto', filter: 'brightness(0) invert(1)', opacity: 0.82 }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        </div>
+
+        {/* Center: back to top */}
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           aria-label="Back to top"
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, background: 'transparent', border: 0, cursor: 'pointer', padding: '4px 12px' }}
         >
-          <ChevronDown className="w-5 h-5 rotate-180 group-hover:animate-bounce" />
-          <span className="text-sm font-medium">{isHe ? 'חזרה למעלה' : 'Back to top'}</span>
+          <span style={{ width: 50, height: 50, borderRadius: 99, background: '#fff', color: '#002828', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px -6px rgba(0,0,0,0.4), 0 0 0 5px rgba(255,255,255,0.06)' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 19V5M5 12l7-7 7 7"/>
+            </svg>
+          </span>
+          <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>
+            {isHe ? 'חזרה למעלה' : 'Back to top'}
+          </span>
         </button>
+
+        {/* Right: HWOOD division */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <img src="/logo.png" alt="HWOOD" style={{ height: 34, width: 'auto', filter: 'brightness(0) invert(1)' }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <div>
+            <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#00d4aa', display: 'block', marginBottom: 4 }}>
+              {isHe ? 'חטיבה' : 'Division'}
+            </span>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: 300 }}>
+              <strong style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>HWOOD</strong>
+              {' · '}{isHe ? 'עיבוד עץ ו-CNC, נתניה' : 'Woodwork & CNC, Netanya'}
+            </span>
+          </div>
+        </div>
       </div>
 
-      <div className="border-t border-neutral-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-meta-sm text-neutral-500">
-        <p>© HWOOD | Netanya, Israel | {t('footer.rights')}</p>
-        <div className="flex flex-wrap gap-6">
-          <a href="#" className="hover:text-white transition-colors">{t('footer.privacy')}</a>
-          <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
+      {/* COPYRIGHT */}
+      <div style={{ position: 'relative', zIndex: 2, padding: '14px 64px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: 'rgba(255,255,255,0.4)', flexWrap: 'wrap', gap: 12 }}>
+        <span>© 2026 HWOOD · Skylum Ltd · Netanya, Israel · {isHe ? 'כל הזכויות שמורות' : 'All rights reserved'}</span>
+        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+          <Link to="/privacy" style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'none' }}>{isHe ? 'פרטיות' : 'Privacy'}</Link>
+          <Link to="/terms"   style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'none' }}>{isHe ? 'תנאים' : 'Terms'}</Link>
+          <Link to="/cookies" style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'none' }}>Cookies</Link>
+          <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+          <span style={{ color: 'rgba(255,255,255,0.4)' }}>EN / עברית</span>
         </div>
       </div>
     </footer>
   );
 };
 
-// Footer Wrapper - simplified to blend with dark sections
-const FooterWrapper: React.FC = () => (
-  <div className="relative w-full bg-[#002828] overflow-hidden">
-    <Footer />
-  </div>
-);
+const FooterWrapper: React.FC = () => <Footer />;
+
+// ── Breadcrumb ────────────────────────────────────────────────────────────────
+interface BreadcrumbProps {
+  items: Array<{ label: string; href?: string }>;
+  orderType?: ServiceOrderType | string | null;
+}
+const Breadcrumb: React.FC<BreadcrumbProps> = ({ items, orderType }) => {
+  const t = getOrderTypeConfig(orderType);
+  return (
+    <nav aria-label="breadcrumb" style={{ padding: '14px 32px', background: '#fafaf8', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 10, fontSize: 11.5, letterSpacing: '.05em', color: '#737373', fontWeight: 500 }}>
+      {items.map((it, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && <span style={{ color: '#c4c4c4' }}>/</span>}
+          {it.href ? (
+            <Link to={it.href} style={{ color: '#737373', textDecoration: 'none' }}>{it.label}</Link>
+          ) : (
+            <span style={{ color: t?.tagFg || BRAND_NEUTRAL, fontWeight: 600 }}>{it.label}</span>
+          )}
+        </React.Fragment>
+      ))}
+    </nav>
+  );
+};
 
 // WhatsApp Button
 const WhatsAppButton: React.FC = () => {
-  // You can make this dynamic by loading from company_info table
   const whatsappNumber = '972549222804';
-
   return (
     <a
       href={`https://wa.me/${whatsappNumber}`}
@@ -320,9 +518,7 @@ const WhatsAppButton: React.FC = () => {
 export const MainLayout: React.FC = () => {
   return (
     <>
-      {/* Loading Screen - shows on first visit only */}
       <LoadingScreen minDuration={1200} />
-      
       <div className="w-full min-h-screen font-sans flex flex-col" style={{ overflowX: 'clip' }}>
         <ScrollToTop />
         <Header />
@@ -333,7 +529,10 @@ export const MainLayout: React.FC = () => {
         </main>
         <FooterWrapper />
         <WhatsAppButton />
+        <CookieBanner />
       </div>
     </>
   );
 };
+
+export { Breadcrumb };

@@ -8,12 +8,22 @@ import React, { useEffect, useState } from 'react';
 import { Mail, MessageSquare, Check, Clock, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import {
   ContactSubmission,
-  QuoteSubmission,
+  QuoteSubmission as QuoteSubmissionBase,
   getContactSubmissions,
   getQuoteSubmissions,
   markContactRead,
   markQuoteRead,
 } from '../adminStore';
+
+type QuoteSubmission = QuoteSubmissionBase & {
+  order_type?: string;
+  service_slug?: string;
+  client_role?: string;
+  material?: string;
+  volume?: string;
+  deadline?: string;
+  file_url?: string;
+};
 
 type TabType = 'contact' | 'quote';
 
@@ -70,22 +80,22 @@ export const AdminSubmissions: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#005f5f]" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
+        <div style={{ width: 24, height: 24, border: '2px solid var(--border-1)', borderTopColor: 'var(--brand)', borderRadius: 999, animation: 'spin 0.8s linear infinite' }} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Submissions</h2>
-        <p className="text-gray-500">Contact messages and quote requests from website visitors</p>
+        <h2 style={{ fontSize: 17, fontWeight: 600, color: 'var(--fg-1)', letterSpacing: '-0.01em', margin: 0 }}>Submissions</h2>
+        <p style={{ fontSize: 12, color: 'var(--fg-3)', marginTop: 3 }}>Contact messages and quote requests from website visitors</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200">
+      <div className="flex gap-2" style={{ borderBottom: '1px solid var(--border-1)' }}>
         <button
           onClick={() => setActiveTab('contact')}
           className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
@@ -232,7 +242,7 @@ export const AdminSubmissions: React.FC = () => {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-gray-900">{item.name}</span>
                         {item.company && (
                           <>
@@ -240,9 +250,25 @@ export const AdminSubmissions: React.FC = () => {
                             <span className="text-gray-500 text-sm">{item.company}</span>
                           </>
                         )}
+                        {(item as any).order_type && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 3,
+                            background: (item as any).order_type === 'browse-and-order' ? '#e5f5f5'
+                                      : (item as any).order_type === 'send-file-and-process' ? '#e8efff'
+                                      : '#fef3e6',
+                            color: (item as any).order_type === 'browse-and-order' ? '#0a4d4d'
+                                 : (item as any).order_type === 'send-file-and-process' ? '#1d4ed8'
+                                 : '#b45309',
+                            textTransform: 'uppercase', letterSpacing: '0.04em',
+                          }}>
+                            {(item as any).order_type === 'browse-and-order' ? 'Catalog'
+                           : (item as any).order_type === 'send-file-and-process' ? 'File'
+                           : 'Custom'}
+                          </span>
+                        )}
                       </div>
-                      <p className="text-gray-600 text-sm">
-                        {item.project_type} {item.budget_range && `• Budget: ${item.budget_range}`}
+                      <p className="text-gray-500 text-sm mt-0.5">
+                        {item.budget_range ? `Budget: ${item.budget_range}` : item.email}
                       </p>
                     </div>
 
@@ -263,56 +289,124 @@ export const AdminSubmissions: React.FC = () => {
                   {/* Expanded Content */}
                   {expandedId === item.id && (
                     <div className="px-4 pb-4 ml-7 border-l-2 border-gray-200">
-                      <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-4">
+                      <div style={{ background: '#fafaf8', border: '1px solid #e5e5e5', borderRadius: 8, padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+
+                        {/* Order type */}
+                        {(item as any).order_type && (
+                          <div>
+                            <span style={{ fontSize: 10, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, display: 'block', marginBottom: 4 }}>Order type</span>
+                            <span style={{
+                              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4,
+                              background: (item as any).order_type === 'browse-and-order' ? '#e5f5f5'
+                                        : (item as any).order_type === 'send-file-and-process' ? '#e8efff'
+                                        : (item as any).order_type === 'describe-and-request' ? '#fef3e6'
+                                        : '#f5f5f5',
+                              color: (item as any).order_type === 'browse-and-order' ? '#0a4d4d'
+                                   : (item as any).order_type === 'send-file-and-process' ? '#1d4ed8'
+                                   : (item as any).order_type === 'describe-and-request' ? '#b45309'
+                                   : '#525252',
+                            }}>
+                              {(item as any).order_type.replace(/-/g, ' ')}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Service slug */}
+                        {(item as any).service_slug && (
+                          <div>
+                            <span style={{ fontSize: 10, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, display: 'block', marginBottom: 4 }}>Service</span>
+                            <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: '#0a0a0a' }}>{(item as any).service_slug}</span>
+                          </div>
+                        )}
+
+                        {/* Phone */}
                         <div>
-                          <span className="text-xs text-gray-500 uppercase">Email</span>
-                          <p className="text-gray-900">{item.email}</p>
+                          <span style={{ fontSize: 10, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, display: 'block', marginBottom: 4 }}>Phone</span>
+                          <span style={{ fontSize: 13, color: '#0a0a0a' }}>{item.phone || '—'}</span>
                         </div>
-                        {item.phone && (
+
+                        {/* Client role */}
+                        {(item as any).client_role && (
                           <div>
-                            <span className="text-xs text-gray-500 uppercase">Phone</span>
-                            <p className="text-gray-900">{item.phone}</p>
+                            <span style={{ fontSize: 10, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, display: 'block', marginBottom: 4 }}>Role</span>
+                            <span style={{ fontSize: 13, color: '#0a0a0a' }}>{(item as any).client_role}</span>
                           </div>
                         )}
-                        {item.project_type && (
+
+                        {/* Material */}
+                        {(item as any).material && (
                           <div>
-                            <span className="text-xs text-gray-500 uppercase">Project Type</span>
-                            <p className="text-gray-900">{item.project_type}</p>
+                            <span style={{ fontSize: 10, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, display: 'block', marginBottom: 4 }}>Material</span>
+                            <span style={{ fontSize: 13, color: '#0a0a0a' }}>{(item as any).material}</span>
                           </div>
                         )}
+
+                        {/* Volume */}
+                        {(item as any).volume && (
+                          <div>
+                            <span style={{ fontSize: 10, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, display: 'block', marginBottom: 4 }}>Volume</span>
+                            <span style={{ fontSize: 13, color: '#0a0a0a' }}>{(item as any).volume}</span>
+                          </div>
+                        )}
+
+                        {/* Deadline */}
+                        {(item as any).deadline && (
+                          <div>
+                            <span style={{ fontSize: 10, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, display: 'block', marginBottom: 4 }}>Deadline</span>
+                            <span style={{ fontSize: 13, color: '#0a0a0a' }}>{(item as any).deadline}</span>
+                          </div>
+                        )}
+
+                        {/* Budget range */}
                         {item.budget_range && (
                           <div>
-                            <span className="text-xs text-gray-500 uppercase">Budget Range</span>
-                            <p className="text-gray-900">{item.budget_range}</p>
+                            <span style={{ fontSize: 10, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, display: 'block', marginBottom: 4 }}>Budget range</span>
+                            <span style={{ fontSize: 13, color: '#0a0a0a' }}>{item.budget_range}</span>
                           </div>
                         )}
+
+                        {/* Timeline */}
                         {item.timeline && (
                           <div>
-                            <span className="text-xs text-gray-500 uppercase">Timeline</span>
-                            <p className="text-gray-900">{item.timeline}</p>
+                            <span style={{ fontSize: 10, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, display: 'block', marginBottom: 4 }}>Timeline</span>
+                            <span style={{ fontSize: 13, color: '#0a0a0a' }}>{item.timeline}</span>
                           </div>
                         )}
+
+                        {/* Products of interest */}
                         {item.product_interest && item.product_interest.length > 0 && (
-                          <div className="col-span-2">
-                            <span className="text-xs text-gray-500 uppercase">Products of Interest</span>
-                            <div className="flex flex-wrap gap-2 mt-1">
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <span style={{ fontSize: 10, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, display: 'block', marginBottom: 6 }}>Products of interest</span>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                               {item.product_interest.map((prod, i) => (
-                                <span key={i} className="px-2 py-1 bg-white rounded text-sm">
-                                  {prod}
-                                </span>
+                                <span key={i} style={{ fontSize: 11, padding: '2px 8px', background: '#fff', border: '1px solid #e5e5e5', borderRadius: 4 }}>{prod}</span>
                               ))}
                             </div>
                           </div>
                         )}
-                        {item.message && (
-                          <div className="col-span-2">
-                            <span className="text-xs text-gray-500 uppercase">Message</span>
-                            <p className="text-gray-900 whitespace-pre-wrap">{item.message}</p>
+
+                        {/* File URL */}
+                        {(item as any).file_url && (
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <span style={{ fontSize: 10, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, display: 'block', marginBottom: 4 }}>Attached file</span>
+                            <a href={(item as any).file_url} target="_blank" rel="noopener noreferrer"
+                               style={{ fontSize: 12, color: '#005f5f', fontFamily: 'ui-monospace, monospace', wordBreak: 'break-all' }}>
+                              View file ↗
+                            </a>
                           </div>
                         )}
-                        
+
+                        {/* Message */}
+                        {item.message && (
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <span style={{ fontSize: 10, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, display: 'block', marginBottom: 4 }}>Message</span>
+                            <p style={{ fontSize: 13, color: '#0a0a0a', whiteSpace: 'pre-wrap', margin: 0 }}>{item.message}</p>
+                          </div>
+                        )}
+
+                        {/* Mark as read */}
                         {!item.is_read && (
-                          <div className="col-span-2">
+                          <div style={{ gridColumn: '1 / -1' }}>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();

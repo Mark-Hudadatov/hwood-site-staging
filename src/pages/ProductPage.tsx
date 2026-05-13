@@ -230,6 +230,13 @@ export const ProductPage: React.FC = () => {
         }
 
         const { service, subservice, category, product } = breadcrumbData;
+
+        // Guard: ProductPage only for browse-and-order
+        if (service.orderType && service.orderType !== 'browse-and-order') {
+          navigate(ROUTES.SERVICE(service.slug), { replace: true });
+          return;
+        }
+
         setService(service);
         setSubservice(subservice);
         setCategory(category);
@@ -264,6 +271,7 @@ export const ProductPage: React.FC = () => {
 
   const getQuoteUrl = () => {
     const params = new URLSearchParams();
+    if (service) params.set('service', service.slug);
     params.set('product', product?.slug || '');
     params.set('productTitle', product?.title || '');
     Object.entries(selections).forEach(([optionSlug, valueSlug]) => {

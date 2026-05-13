@@ -1,340 +1,252 @@
 /**
- * QUOTE PAGE - HWOOD
- * ==================
- * Quote request form
+ * QUOTE PAGE — browse-and-order
+ * ==============================
+ * Route: /quote  or  /quote/:productSlug
+ *
+ * Used for: catalog orders (product → quote → thank-you)
+ * For project/custom orders → LeadFormView inside SubservicePage
  */
 
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Upload, Send, ArrowLeft, FileText, CheckCircle } from 'lucide-react';
-import { getProductBySlug, getServices, getCompanyInfo } from '../services/data/dataService';
-import { Product, Service, CompanyInfo  } from '../domain/types';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { ArrowRight, Check, ArrowLeft } from 'lucide-react';
+import { Product, Service, CompanyInfo } from '../domain/types';
+import { getProductBySlug, getServices, getCompanyInfo, submitQuoteRequest } from '../services/data/dataService';
+import { ROUTES } from '../router';
+import { Stripes } from '../components/journey/stripes';
+import { getHeroColors, getOrderTypeConfig, BRAND_NEUTRAL } from '../lib/OrderTypes';
 
+const HERO = getHeroColors('browse-and-order');
+const T = getOrderTypeConfig('browse-and-order');
+
+// ── Quote form ──────────────────────────────────────────────────────────────
 export const QuotePage: React.FC = () => {
-  const { productSlug } = useParams();
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
+  const { productSlug } = useParams<{ productSlug?: string }>();
+  const navigate = useNavigate();
+  const { i18n } = useTranslation();
+  const lang = i18n.language?.startsWith('he') ? 'he' : 'en';
+
   const [product, setProduct] = useState<Product | null>(null);
   const [services, setServices] = useState<Service[]>([]);
-  const [submitted, setSubmitted] = useState(false);
-  
-  const [formData, setFormData] = useState({
-    companyName: '',
-    contactName: '',
-    email: '',
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [form, setForm] = useState({
+    name: '',
+    company: '',
     phone: '',
-    serviceType: '',
-    projectDescription: '',
-    quantity: '',
-    deadline: '',
-    hasDrawings: false,
+    email: '',
     message: '',
+    material: 'MDF 18mm',
+    quantity: '',
+    deadline: 'Within 1 wk',
   });
 
   useEffect(() => {
-    const loadData = async () => {
-      const [allServices, info] = await Promise.all([getServices(), getCompanyInfo()]);
-      setServices(allServices);
+    Promise.all([getServices(), getCompanyInfo()]).then(([svcs, info]) => {
+      setServices(svcs);
       setCompanyInfo(info);
-      
-      if (productSlug) {
-        const prod = await getProductBySlug(productSlug);
-        if (prod) {
-          setProduct(prod);
-        }
-      }
-    };
-    loadData();
+    });
+    if (productSlug) {
+      getProductBySlug(productSlug).then(p => { if (p) setProduct(p); });
+    }
   }, [productSlug]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Quote request submitted:', formData);
-    setSubmitted(true);
-    window.scrollTo(0, 0);
-  };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
-    }));
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  if (submitted) {
-    return (
-      <div className="w-full min-h-[80vh] flex items-center justify-center bg-neutral-50">
-        <div className="max-w-lg mx-auto px-6 text-center">
-          <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-green-600" />
-          </div>
-          <h1 className="text-3xl font-medium text-neutral-900 mb-4">
-            Quote Request Received!
-          </h1>
-          <p className="text-neutral-600 mb-8">
-            Thank you for your interest in {companyInfo.name}. Our team will review your 
-            request and get back to you within 1-2 business days.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link 
-              to="/"
-              className="bg-brand text-white px-8 py-3 rounded-xl font-medium hover:bg-brand/90 transition-colors"
-            >
-              Back to Home
-            </Link>
-            <Link 
-              to="/services/modular-cabinet-systems"
-              className="border-2 border-brand text-brand px-8 py-3 rounded-xl font-medium hover:bg-brand/5 transition-colors"
-            >
-              Explore Services
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const setChip = (field: keyof typeof form, value: string) =>
+    setForm(prev => ({ ...prev, [field]: value }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await submitQuoteRequest({
+        name: form.name,
+        email: form.email,
+        phone: form.phone || undefined,
+        company: form.company || undefined,
+        message: [form.message, form.material, form.quantity, form.deadline].filter(Boolean).join(' | ') || undefined,
+        product_interest: productSlug ? [productSlug] : undefined,
+      });
+      navigate('/thank-you/browse-and-order');
+    } catch {
+      setSubmitting(false);
+    }
+  };
+
+  const chip = (opts: string[], field: keyof typeof form) => (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {opts.map(o => (
+        <button key={o} type="button" onClick={() => setChip(field, o)}
+          style={{ padding: '10px 14px', borderRadius: 99, fontFamily: 'inherit', border: form[field] === o ? `1.5px solid ${T.accent}` : '1px solid #e0e0e0', background: form[field] === o ? T.tagBg : '#fff', color: form[field] === o ? T.tagFg : '#262626', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+        >{o}</button>
+      ))}
+    </div>
+  );
 
   return (
-    <div className="w-full bg-neutral-50">
-      {/* Header */}
-      <div className="bg-brand text-white py-12 md:py-16">
-        <div className="max-w-4xl mx-auto px-6 md:px-12">
-          <Link to="/" className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-            Back to Home
+    <div style={{ background: '#fff' }}>
+      {/* Hero */}
+      <section style={{ background: `linear-gradient(135deg, ${HERO.heroFrom}, ${HERO.heroTo})`, padding: '72px 32px 96px', color: '#fff', position: 'relative', overflow: 'hidden' }}>
+        <Stripes opacity={0.18} />
+        <div style={{ maxWidth: 1280, margin: '0 auto', position: 'relative', zIndex: 2 }}>
+          <Link to={product ? ROUTES.PRODUCT(product.slug) : '/'} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'rgba(255,255,255,.7)', fontSize: 12, fontWeight: 600, textDecoration: 'none', marginBottom: 24, letterSpacing: '.05em' }}>
+            <ArrowLeft size={14} /> {lang === 'he' ? 'חזרה' : 'Back'}
           </Link>
-          <h1 className="text-3xl md:text-4xl font-medium mb-3">
-            Request a Quote
+          <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: T.accent, display: 'block', marginBottom: 12 }}>
+            {lang === 'he' ? 'הזמנה מקטלוג' : 'Catalog Order'}
+          </span>
+          <h1 style={{ fontSize: 64, fontWeight: 600, letterSpacing: '-.025em', lineHeight: 1.05, margin: '0 0 16px', fontFamily: "'Inter Display', Inter, sans-serif" }}>
+            {lang === 'he' ? 'קבל הצעת מחיר' : 'Request a quote.'}
           </h1>
-          <p className="text-lg text-white/80">
-            Tell us about your project and we'll provide a detailed quote.
+          <p style={{ fontSize: 17, color: 'rgba(255,255,255,.78)', fontWeight: 300, lineHeight: 1.55, margin: 0, maxWidth: 520 }}>
+            {lang === 'he'
+              ? 'מלא את הטופס ואנו נחזור אליך תוך יום עסקים אחד עם הצעת מחיר מפורטת.'
+              : "Fill in the form and we'll come back with a costed quote within one business day."}
           </p>
-          {product && (
-            <div className="mt-6 bg-white/10 rounded-xl p-4 inline-flex items-center gap-4">
-              <img 
-                src={product.imageUrl} 
-                alt={product.title}
-                className="w-16 h-16 object-cover rounded-lg"
-              />
-              <div>
-                <div className="text-sm text-white/70">Requesting quote for:</div>
-                <div className="font-medium">{product.title}</div>
-              </div>
-            </div>
-          )}
         </div>
-      </div>
+      </section>
 
-      {/* Form */}
-      <div className="max-w-4xl mx-auto px-6 md:px-12 py-12 md:py-16">
-        <form onSubmit={handleSubmit} className="space-y-10">
-          
-          {/* Contact Information */}
-          <div className="bg-white rounded-xl p-6 md:p-8 shadow-sm">
-            <h2 className="text-xl font-medium text-neutral-900 mb-6 flex items-center gap-2">
-              <span className="w-8 h-8 bg-brand text-white rounded-full flex items-center justify-center text-sm">1</span>
-              Contact Information
-            </h2>
-            
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Company Name *
-                </label>
-                <input
-                  type="text"
-                  name="companyName"
-                  value={formData.companyName}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent outline-none"
-                  placeholder="Your Company"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Contact Name *
-                </label>
-                <input
-                  type="text"
-                  name="contactName"
-                  value={formData.contactName}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent outline-none"
-                  placeholder="Your Name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent outline-none"
-                  placeholder="email@company.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Phone Number *
-                </label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent outline-none"
-                  placeholder="+972-XX-XXX-XXXX"
-                />
-              </div>
-            </div>
-          </div>
+      {/* Form + sidebar */}
+      <section style={{ background: '#fafaf8', padding: '0 32px 96px', marginTop: -40, position: 'relative', zIndex: 3 }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 32 }}>
 
-          {/* Project Details */}
-          <div className="bg-white rounded-xl p-6 md:p-8 shadow-sm">
-            <h2 className="text-xl font-medium text-neutral-900 mb-6 flex items-center gap-2">
-              <span className="w-8 h-8 bg-brand text-white rounded-full flex items-center justify-center text-sm">2</span>
-              Project Details
-            </h2>
-            
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Service Type *
-                </label>
-                <select
-                  name="serviceType"
-                  value={formData.serviceType}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent outline-none"
-                >
-                  <option value="">Select a service...</option>
-                  {services.map(service => (
-                    <option key={service.id} value={service.slug}>
-                      {service.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          {/* Form */}
+          <form onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 20, padding: 40, boxShadow: '0 12px 40px -16px rgba(0,0,0,.12)', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Project Description *
-                </label>
-                <textarea
-                  name="projectDescription"
-                  value={formData.projectDescription}
-                  onChange={handleChange}
-                  required
-                  rows={4}
-                  className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent outline-none resize-none"
-                  placeholder="Describe your project requirements, specifications, materials needed..."
-                />
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6">
+            {product && (
+              <div style={{ background: T.tagBg, borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                {product.imageUrl && (
+                  <img src={product.imageUrl} alt="" style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover' }} />
+                )}
                 <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Estimated Quantity
-                  </label>
-                  <input
-                    type="text"
-                    name="quantity"
-                    value={formData.quantity}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent outline-none"
-                    placeholder="e.g., 50 units, 100 sqm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Target Deadline
-                  </label>
-                  <input
-                    type="date"
-                    name="deadline"
-                    value={formData.deadline}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent outline-none"
-                  />
+                  <span style={{ fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', fontWeight: 700, color: T.tagFg }}>Selected product</span>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#0a0a0a', marginTop: 2 }}>{product.title}</div>
                 </div>
               </div>
-            </div>
-          </div>
+            )}
 
-          {/* File Upload */}
-          <div className="bg-white rounded-xl p-6 md:p-8 shadow-sm">
-            <h2 className="text-xl font-medium text-neutral-900 mb-6 flex items-center gap-2">
-              <span className="w-8 h-8 bg-brand text-white rounded-full flex items-center justify-center text-sm">3</span>
-              Attachments (Optional)
-            </h2>
-            
-            <div className="border-2 border-dashed border-neutral-300 rounded-xl p-8 text-center hover:border-brand transition-colors cursor-pointer">
-              <Upload className="w-12 h-12 text-neutral-400 mx-auto mb-4" />
-              <p className="text-neutral-600 mb-2">
-                Drop your files here or <span className="text-brand font-medium">browse</span>
-              </p>
-              <p className="text-sm text-neutral-400">
-                Upload drawings, specifications, or reference images (PDF, DWG, JPG, PNG)
-              </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: '#262626' }}>
+                {lang === 'he' ? 'חומר' : 'Material'}
+              </span>
+              {chip(['MDF 18mm', 'MDF 16mm', 'Egger', 'Plywood', 'Other'], 'material')}
             </div>
 
-            <div className="mt-4">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="hasDrawings"
-                  checked={formData.hasDrawings}
-                  onChange={handleChange}
-                  className="w-5 h-5 rounded border-neutral-300 text-brand focus:ring-brand"
-                />
-                <span className="text-neutral-700">I have technical drawings ready to share</span>
-              </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: '#262626' }}>
+                {lang === 'he' ? 'כמות (בקירוב)' : 'Quantity (approximate)'}
+              </span>
+              <input
+                name="quantity"
+                value={form.quantity}
+                onChange={handleChange}
+                placeholder={lang === 'he' ? 'למשל: 24 מודולים' : 'e.g. 24 modules, or 8 sheets'}
+                style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: 14, fontFamily: 'inherit', color: '#0a0a0a', outline: 'none' }}
+              />
             </div>
-          </div>
 
-          {/* Additional Notes */}
-          <div className="bg-white rounded-xl p-6 md:p-8 shadow-sm">
-            <h2 className="text-xl font-medium text-neutral-900 mb-6 flex items-center gap-2">
-              <span className="w-8 h-8 bg-brand text-white rounded-full flex items-center justify-center text-sm">4</span>
-              Additional Notes
-            </h2>
-            
-            <textarea
-              name="message"
-              value={formData.message}
-              onChange={handleChange}
-              rows={3}
-              className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent outline-none resize-none"
-              placeholder="Any additional information or questions..."
-            />
-          </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: '#262626' }}>
+                {lang === 'he' ? 'מועד אספקה' : 'Deadline'}
+              </span>
+              {chip(['ASAP', 'Within 1 wk', '2–3 wks', 'Flexible'], 'deadline')}
+            </div>
 
-          {/* Submit */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-end">
-            <Link
-              to="/"
-              className="px-8 py-4 border-2 border-neutral-300 text-neutral-700 rounded-xl font-medium hover:bg-neutral-50 transition-colors text-center"
-            >
-              Cancel
-            </Link>
-            <button
-              type="submit"
-              className="px-8 py-4 bg-brand text-white rounded-xl font-medium hover:bg-brand/90 transition-colors flex items-center justify-center gap-2"
-            >
-              <Send className="w-5 h-5" />
-              Submit Quote Request
-            </button>
-          </div>
-        </form>
-      </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: '#262626' }}>
+                {lang === 'he' ? 'הערות נוספות' : 'Additional notes'}
+              </span>
+              <textarea
+                name="message"
+                value={form.message}
+                onChange={handleChange}
+                placeholder={lang === 'he' ? 'גוונים, גימורים, דרישות מיוחדות…' : 'Finishes, edge band colour, delivery notes…'}
+                rows={3}
+                style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: 14, fontFamily: 'inherit', color: '#0a0a0a', resize: 'vertical', outline: 'none' }}
+              />
+            </div>
+
+            <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: '#262626' }}>
+                {lang === 'he' ? 'פרטי התקשרות' : 'Contact details'}
+              </span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <input name="name" value={form.name} onChange={handleChange} placeholder={lang === 'he' ? 'שמך *' : 'Your name *'} required style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: 14, fontFamily: 'inherit', color: '#0a0a0a', outline: 'none' }} />
+                <input name="company" value={form.company} onChange={handleChange} placeholder={lang === 'he' ? 'חברה (אופציונלי)' : 'Company (optional)'} style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: 14, fontFamily: 'inherit', color: '#0a0a0a', outline: 'none' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <input name="phone" value={form.phone} onChange={handleChange} placeholder="+972 …" required style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: 14, fontFamily: 'inherit', color: '#0a0a0a', outline: 'none' }} />
+                <input name="email" value={form.email} onChange={handleChange} type="email" placeholder="email@company.com" style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: 14, fontFamily: 'inherit', color: '#0a0a0a', outline: 'none' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: '#a3a3a3' }}>
+                {lang === 'he' ? 'בשליחה אתה מסכים לתנאי הפרטיות שלנו.' : 'By submitting, you agree to our privacy terms.'}
+              </span>
+              <button type="submit" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 24px', borderRadius: 999, background: BRAND_NEUTRAL, color: '#fff', fontSize: 13, fontWeight: 700, cursor: submitting ? 'wait' : 'pointer', border: 0, fontFamily: 'inherit' }}>
+                {submitting ? (lang === 'he' ? 'שולח…' : 'Sending…') : (lang === 'he' ? 'שלח הצעת מחיר' : 'Send quote request')} <ArrowRight size={14} />
+              </button>
+            </div>
+          </form>
+
+          {/* Sidebar */}
+          <aside style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingTop: 40 }}>
+            <div style={{ background: `linear-gradient(135deg, ${HERO.heroFrom}10, transparent)`, border: `1px solid ${T.accent}40`, borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: T.tagFg }}>What happens next</span>
+              {[
+                ['01', 'We review your request', 'Our production team checks availability and pricing.'],
+                ['02', 'Quote in your inbox', 'Itemised list, lead time, and stock confirmation. Within 1 business day.'],
+                ['03', 'You approve, we produce', 'Payment and production kick off immediately on approval.'],
+              ].map(([n, l, d]) => (
+                <div key={n} style={{ display: 'flex', gap: 14 }}>
+                  <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, fontWeight: 700, color: T.tagFg, paddingTop: 2 }}>{n}</span>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#0a0a0a', marginBottom: 2 }}>{l}</div>
+                    <span style={{ fontSize: 12.5, color: '#525252', lineHeight: 1.5, fontWeight: 300 }}>{d}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ background: '#0a0a0a', borderRadius: 16, padding: 24, color: '#fff', display: 'flex', flexDirection: 'column', gap: 12, position: 'relative', overflow: 'hidden' }}>
+              <Stripes opacity={0.18} />
+              <div style={{ position: 'relative', zIndex: 2 }}>
+                <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: T.accent }}>Prefer to talk first?</span>
+                <h3 style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-.015em', margin: '10px 0 14px', fontFamily: "'Inter Display', Inter, sans-serif" }}>
+                  Call the order desk directly.
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <a href="tel:+97298900000" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 18px', borderRadius: 99, background: BRAND_NEUTRAL, color: '#fff', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+                    +972 9 890-0000
+                  </a>
+                  <a href="https://wa.me/972501234567" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 18px', borderRadius: 99, background: '#25D366', color: '#fff', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+                    WhatsApp · +972 50 890-0000
+                  </a>
+                </div>
+                <span style={{ display: 'block', marginTop: 14, fontFamily: 'ui-monospace, monospace', fontSize: 11, color: 'rgba(255,255,255,.5)' }}>
+                  Sun–Thu · 9:00 – 18:00 IST
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {[['Free', 'quote · no commitment'], ['72 h', 'avg. production time']].map(([k, v]) => (
+                <div key={k} style={{ background: '#fff', borderRadius: 12, padding: '16px 18px', border: '1px solid #f0f0f0' }}>
+                  <span style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-.02em', color: '#0a0a0a', display: 'block', fontFamily: "'Inter Display', Inter, sans-serif" }}>{k}</span>
+                  <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: '#737373', display: 'block', marginTop: 4 }}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </aside>
+        </div>
+      </section>
     </div>
   );
 };

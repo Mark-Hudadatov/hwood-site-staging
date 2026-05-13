@@ -7,6 +7,8 @@
 import { supabase } from '../supabase';
 import {
   Service,
+  ServiceBrand,
+  ServiceOrderType,
   Subservice,
   ProductCategory,
   Product,
@@ -16,6 +18,8 @@ import {
   ConfigOptionType,
   ConfigOptionValue,
   ProductConfiguration,
+  OrderSubmission,
+  QuoteSubmissionResult,
 } from '../../domain/types';
 
 // ============================================================================
@@ -71,6 +75,10 @@ export async function getServices(): Promise<Service[]> {
       heroImageUrl: s.hero_image_url || '',
       accentColor: s.accent_color || '#005f5f',
       visibilityStatus: s.visibility_status,
+      subtitle: lang === 'he' && s.subtitle_he ? s.subtitle_he : s.subtitle_en || '',
+      ctaText: lang === 'he' && s.cta_text_he ? s.cta_text_he : s.cta_text_en || 'Learn More',
+      brand: (s.brand as ServiceBrand) || 'hwood',
+      orderType: (s.order_type as ServiceOrderType) || 'browse-and-order',
     }));
 
     console.log('[DataService] Mapped services:', services);
@@ -103,6 +111,11 @@ export async function getServiceBySlug(slug: string): Promise<Service | null> {
       imageUrl: data.image_url || '',
       heroImageUrl: data.hero_image_url || '',
       accentColor: data.accent_color || '#005f5f',
+      subtitle: lang === 'he' && data.subtitle_he ? data.subtitle_he : data.subtitle_en || '',
+      ctaText: lang === 'he' && data.cta_text_he ? data.cta_text_he : data.cta_text_en || 'Learn More',
+      visibilityStatus: data.visibility_status,
+      brand: (data.brand as ServiceBrand) || 'hwood',
+      orderType: (data.order_type as ServiceOrderType) || 'browse-and-order',
     };
   } catch (e) {
     console.error('[DataService] getServiceBySlug exception:', e);
@@ -829,6 +842,137 @@ export async function getSubserviceIdForProduct(productId: string): Promise<stri
 
     return category.subservice_id;
   } catch (e) {
+    return null;
+  }
+}
+
+// ============================================================================
+// NEW v2.0 — SERVICES BY BRAND
+// ============================================================================
+
+export async function getServicesByBrand(brand: ServiceBrand): Promise<Service[]> {
+  try {
+    const { data, error } = await supabase
+      .from('services')
+      .select('*')
+      .eq('brand', brand)
+      .in('visibility_status', ['visible', 'coming_soon'])
+      .order('sort_order', { ascending: true });
+
+    if (error || !data || data.length === 0) return [];
+
+    const lang = getCurrentLang();
+    return data.map((s: any) => ({
+      id: s.id,
+      slug: s.slug,
+      title: lang === 'he' && s.title_he ? s.title_he : s.title_en,
+      subtitle: lang === 'he' && s.subtitle_he ? s.subtitle_he : s.subtitle_en || '',
+      description: lang === 'he' && s.description_he ? s.description_he : s.description_en || '',
+      ctaText: lang === 'he' && s.cta_text_he ? s.cta_text_he : s.cta_text_en || 'Learn More',
+      imageUrl: s.image_url || '',
+      heroImageUrl: s.hero_image_url || '',
+      accentColor: s.accent_color || '#005f5f',
+      visibilityStatus: s.visibility_status,
+      brand: (s.brand as ServiceBrand) || 'hwood',
+      orderType: (s.order_type as ServiceOrderType) || 'browse-and-order',
+    }));
+  } catch (e) {
+    console.error('[DataService] getServicesByBrand exception:', e);
+    return [];
+  }
+}
+
+// ============================================================================
+// NEW v2.0 — ORDER FORM SUBMISSION
+// ============================================================================
+
+export async function submitOrderForm(
+  submission: OrderSubmission
+): Promise<QuoteSubmissionResult> {
+  try {
+    const base = {
+      name:         submission.name,
+      phone:        submission.phone,
+      company:      submission.company || null,
+      order_type:   submission.orderType,
+      service_slug: submission.serviceSlug,
+      message:      JSON.stringify(submission),
+      is_read:      false,
+    };
+
+    let extra: Record<string, any> = {};
+
+    if (submission.orderType === 'browse-and-order') {
+      extra = {
+        product_interest: submission.productTitle ? [submission.productTitle] : [],
+        project_type:     'Browse & Order',
+        timeline:         submission.quantity || null,
+      };
+    }
+
+    if (submission.orderType === 'send-file-and-process') {
+      extra = {
+        project_type:    submission.operationType || 'CNC Service',
+        subservice_slug: submission.subserviceSlug || null,
+        material:        submission.material || null,
+        volume:          submission.volume || null,
+        deadline:        submission.deadline || null,
+        file_url:        submission.fileUrl || null,
+      };
+    }
+
+    if (submission.orderType === 'describe-and-request') {
+      extra = {
+        project_type: submission.objectType || 'Custom Project',
+        client_role:  submission.clientRole,
+        object_type:  submission.objectType || null,
+        material:     submission.material || null,
+        volume:       submission.approximateVolume || null,
+        file_url:     submission.fileUrl || null,
+      };
+    }
+
+    const { error } = await supabase
+      .from('quote_submissions')
+      .insert([{ ...base, ...extra }]);
+
+    if (error) {
+      console.error('[DataService] submitOrderForm error:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (e) {
+    console.error('[DataService] submitOrderForm exception:', e);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+// ============================================================================
+// NEW v2.0 — FILE UPLOAD FOR ORDER FORMS
+// ============================================================================
+
+export async function uploadOrderFile(file: File): Promise<string | null> {
+  try {
+    const ext = file.name.split('.').pop();
+    const path = `order-files/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from('images')
+      .upload(path, file, { cacheControl: '3600', upsert: false });
+
+    if (error) {
+      console.error('[DataService] uploadOrderFile error:', error);
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('images')
+      .getPublicUrl(path);
+
+    return publicUrl;
+  } catch (e) {
+    console.error('[DataService] uploadOrderFile exception:', e);
     return null;
   }
 }

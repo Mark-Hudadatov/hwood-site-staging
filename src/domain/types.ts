@@ -15,6 +15,14 @@
 // CORE DOMAIN ENTITIES
 // =============================================================================
 
+export type ServiceBrand = 'hwood' | 'skylum';
+
+export type ServiceOrderType =
+  | 'browse-and-order'
+  | 'send-file-and-process'
+  | 'describe-and-request'
+  | 'informational';
+
 /**
  * Service - Top-level offering
  * Examples: "Modular bodies and cabinets", "CNC processing of panels", "Furniture fronts production"
@@ -27,6 +35,11 @@ export interface Service {
   imageUrl: string;
   heroImageUrl?: string;           // Optional larger hero image for service page
   accentColor?: string;            // Optional brand color (e.g., "#D48F28")
+  subtitle?: string;
+  ctaText?: string;
+  visibilityStatus?: string;
+  brand?: ServiceBrand;
+  orderType?: ServiceOrderType;
 }
 
 /**
@@ -126,6 +139,56 @@ export interface QuoteRequest {
   // Metadata
   submittedAt?: string;
 }
+export interface OrderContact {
+  name: string;
+  phone: string;
+  company?: string;
+}
+
+export interface BrowseOrderSubmission extends OrderContact {
+  orderType: 'browse-and-order';
+  serviceSlug: string;
+  productId?: string;
+  productTitle?: string;
+  selectedConfiguration?: Record<string, string>;
+  quantity?: string;
+  comment?: string;
+}
+
+export interface SendFileSubmission extends OrderContact {
+  orderType: 'send-file-and-process';
+  serviceSlug: string;
+  subserviceSlug?: string;
+  operationType?: string;
+  material?: string;
+  thickness?: string;
+  volume?: string;
+  deadline?: string;
+  description?: string;
+  fileUrl?: string;
+}
+
+export interface DescribeRequestSubmission extends OrderContact {
+  orderType: 'describe-and-request';
+  serviceSlug: string;
+  clientRole: 'designer' | 'contractor' | 'developer' | 'private';
+  objectType?: string;
+  material?: string;
+  approximateVolume?: string;
+  description: string;
+  fileUrl?: string;
+}
+
+export type OrderSubmission =
+  | BrowseOrderSubmission
+  | SendFileSubmission
+  | DescribeRequestSubmission;
+
+export interface QuoteSubmissionResult {
+  success: boolean;
+  error?: string;
+}
+
 /**
  * Company Info - Basic company details
  */

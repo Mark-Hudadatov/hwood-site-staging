@@ -1,412 +1,487 @@
 /**
- * SUBSERVICE PAGE - FIXED
- * =======================
- * FIXES:
- * ✅ Category tabs with LEFT/RIGHT navigation arrows
- * ✅ Product images with fallback placeholders
- * ✅ Horizontal scroll for categories
- * ✅ Better loading states
+ * SUBSERVICE PAGE — Conditional by order type
+ * =============================================
+ * Route: /subservices/:subserviceSlug
+ *
+ * browse-and-order      → Category tabs + product grid + sticky CTA
+ * send-file-and-process → Lead form (inline) — LeadFormView
+ * describe-and-request  → Lead form (inline) — LeadFormView
+ * informational         → Info-only content
+ *
+ * Design ref: redesign/journey/page-subservice.jsx + page-leadform.jsx
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Service, Subservice, ProductCategory, Product } from '../domain/types';
-import { getSubservicePageData } from '../services/data/dataService';
+import {
+  ArrowRight, ChevronLeft, ChevronRight, Upload, Check, Plus, FileText,
+  Clock, X,
+} from 'lucide-react';
+import {
+  Subservice, ProductCategory, Product, Service,
+} from '../domain/types';
+import { getSubservicePageData, submitQuoteRequest, uploadOrderFile } from '../services/data/dataService';
 import { ROUTES } from '../router';
-import { ScrollReveal, StaggerReveal } from '../components/premium';
+import { Stripes } from '../components/journey/stripes';
+import { HowItWorks, CTABanner } from '../components/journey/sections';
+import { OrderTypeTag } from '../components/ui/OrderTypeTag';
+import { BrandBadge } from '../components/ui/BrandBadge';
+import { getHeroColors, getOrderTypeConfig, BRAND_NEUTRAL } from '../lib/OrderTypes';
+import { Breadcrumb } from '../layouts/mainlayout';
 
-// Fallback image for products - dark background with small wood plank icon
-const PRODUCT_FALLBACK = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" fill="none"><rect width="600" height="600" fill="#1a1a1a"/><g transform="translate(260, 260)" stroke="#ffffff" stroke-width="2.5" fill="none" opacity="0.4"><rect x="0" y="5" width="80" height="12" rx="2"/><rect x="0" y="22" width="80" height="12" rx="2"/><rect x="0" y="39" width="80" height="12" rx="2"/><rect x="0" y="56" width="80" height="12" rx="2"/><line x1="20" y1="5" x2="20" y2="68" stroke-width="1" opacity="0.3"/><line x1="40" y1="5" x2="40" y2="68" stroke-width="1" opacity="0.3"/><line x1="60" y1="5" x2="60" y2="68" stroke-width="1" opacity="0.3"/></g></svg>`)}`;
+// ── Product card (browse-and-order) ───────────────────────────────────────────
+const PRODUCT_FALLBACK = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" fill="none"><rect width="600" height="600" fill="#1a1a1a"/><g transform="translate(260,260)" stroke="#fff" stroke-width="2.5" fill="none" opacity="0.3"><rect x="0" y="5" width="80" height="12" rx="2"/><rect x="0" y="22" width="80" height="12" rx="2"/><rect x="0" y="39" width="80" height="12" rx="2"/></g></svg>`)}`;
 
-// =============================================================================
-// PRODUCT CARD COMPONENT
-// =============================================================================
-
-interface ProductCardProps {
-  product: Product;
-  onClick: () => void;
-}
-
-const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) => {
-  const [imgError, setImgError] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
-
-  const imageSrc = imgError || !product.imageUrl ? PRODUCT_FALLBACK : product.imageUrl;
-
+interface ProductCardProps { product: Product; onClick: () => void; accent: string; tagBg: string; tagFg: string; }
+const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, accent, tagBg, tagFg }) => {
+  const [imgErr, setImgErr] = useState(false);
+  const isComingSoon = product.visibilityStatus === 'coming_soon';
   return (
-    <div 
-      className="group cursor-pointer bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300"
-      onClick={onClick}
+    <div onClick={!isComingSoon ? onClick : undefined} style={{ background: '#fff', borderRadius: 20, overflow: 'hidden', border: '1px solid #e5e5e5', cursor: isComingSoon ? 'default' : 'pointer', transition: 'transform .3s, box-shadow .3s, border-color .3s' }}
+      onMouseEnter={e => { if (!isComingSoon) { const el = e.currentTarget as HTMLElement; el.style.transform = 'translateY(-6px)'; el.style.boxShadow = '0 20px 40px -12px rgba(0,0,0,.2)'; el.style.borderColor = '#0a0a0a'; }}}
+      onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.transform = ''; el.style.boxShadow = ''; el.style.borderColor = '#e5e5e5'; }}
     >
-      {/* Image */}
-      <div className="w-full aspect-square bg-neutral-100 overflow-hidden relative">
-        {!imgLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-neutral-100">
-            <div className="w-8 h-8 border-2 border-neutral-300 border-t-brand rounded-full animate-spin" />
+      <div style={{ position: 'relative', aspectRatio: '1/1', background: '#f5f5f5', overflow: 'hidden' }}>
+        <img src={imgErr || !product.imageUrl ? PRODUCT_FALLBACK : product.imageUrl} alt={product.title}
+          onError={() => setImgErr(true)}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: isComingSoon ? 'cover' : 'contain', padding: isComingSoon ? 0 : 16, filter: isComingSoon ? 'grayscale(1) brightness(.7)' : 'none', transition: 'transform .4s' }}
+        />
+        {isComingSoon && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, background: 'rgba(0,0,0,.5)' }}>
+            <Clock size={20} color="rgba(255,255,255,.8)" />
+            <span style={{ fontSize: 9, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: 'rgba(255,255,255,.8)' }}>Coming Soon</span>
           </div>
         )}
-        <img
-          src={imageSrc}
-          alt={product.title}
-          className={`w-full h-full object-cover p-4 transition-all duration-500 group-hover:scale-110 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-          onLoad={() => setImgLoaded(true)}
-          onError={() => {
-            setImgError(true);
-            setImgLoaded(true);
-          }}
-        />
       </div>
-      
-      {/* Content */}
-      <div className="p-5">
-        <h3 className="text-lg font-medium text-[#1A1A1A] mb-1 group-hover:text-brand transition-colors">
-          {product.title}
-        </h3>
-        {product.subtitle && (
-          <p className="text-sm text-neutral-500">{product.subtitle}</p>
+      <div style={{ padding: '16px 20px' }}>
+        <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: accent, fontWeight: 700, marginBottom: 4, letterSpacing: '.05em' }}>{product.subtitle || product.categoryId}</div>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: '#0a0a0a', margin: 0, lineHeight: 1.3 }}>{product.title}</h3>
+        {!isComingSoon && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: tagFg, letterSpacing: '.1em', textTransform: 'uppercase' }}>Configure</span>
+            <ArrowRight size={12} color={tagFg} />
+          </div>
         )}
       </div>
     </div>
   );
 };
 
-// =============================================================================
-// CATEGORY TABS WITH NAVIGATION ARROWS
-// =============================================================================
-
-interface CategoryTabsProps {
+// ── CATALOG VIEW (browse-and-order) ───────────────────────────────────────────
+interface CatalogViewProps {
+  subservice: Subservice;
+  service: Service | null;
   categories: ProductCategory[];
-  activeTab: string;
-  setActiveTab: (id: string) => void;
+  products: Product[];
 }
 
-const CategoryTabs: React.FC<CategoryTabsProps> = ({ categories, activeTab, setActiveTab }) => {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [showLeftArrow, setShowLeftArrow] = useState(false);
-  const [showRightArrow, setShowRightArrow] = useState(true);
-  const { i18n } = useTranslation();
-  const isRTL = i18n.language?.startsWith('he') || document.documentElement.dir === 'rtl';
-
-  // Drag scroll state
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollStart, setScrollStart] = useState(0);
-  const [hasDragged, setHasDragged] = useState(false);
-
-  const checkScroll = useCallback(() => {
-    if (scrollRef.current) {
-      const { scrollWidth, clientWidth } = scrollRef.current;
-      const hasOverflow = scrollWidth > clientWidth + 10;
-      // Always show both arrows if there's overflow - RTL scroll detection is unreliable
-      setShowLeftArrow(hasOverflow);
-      setShowRightArrow(hasOverflow);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkScroll();
-    const el = scrollRef.current;
-    if (el) {
-      el.addEventListener('scroll', checkScroll);
-      window.addEventListener('resize', checkScroll);
-    }
-    return () => {
-      if (el) el.removeEventListener('scroll', checkScroll);
-      window.removeEventListener('resize', checkScroll);
-    };
-  }, [categories, checkScroll]);
-
-  const scroll = (direction: 'left' | 'right') => {
-    if (scrollRef.current) {
-      const amount = direction === 'right' ? 300 : -300;
-      scrollRef.current.scrollBy({ left: amount, behavior: 'smooth' });
-    }
-  };
-
-  // Drag handlers
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!scrollRef.current) return;
-    setIsDragging(true);
-    setHasDragged(false);
-    setStartX(e.pageX);
-    setScrollStart(scrollRef.current.scrollLeft);
-    scrollRef.current.style.cursor = 'grabbing';
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !scrollRef.current) return;
-    e.preventDefault();
-    const dx = e.pageX - startX;
-    scrollRef.current.scrollLeft = scrollStart - dx;
-    if (Math.abs(dx) > 5) setHasDragged(true);
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    if (scrollRef.current) scrollRef.current.style.cursor = 'grab';
-  };
-
-  const handleMouseLeave = () => {
-    setIsDragging(false);
-    if (scrollRef.current) scrollRef.current.style.cursor = 'grab';
-  };
-
-  // Touch drag support
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (!scrollRef.current) return;
-    setIsDragging(true);
-    setHasDragged(false);
-    setStartX(e.touches[0].pageX);
-    setScrollStart(scrollRef.current.scrollLeft);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || !scrollRef.current) return;
-    const dx = e.touches[0].pageX - startX;
-    scrollRef.current.scrollLeft = scrollStart - dx;
-    if (Math.abs(dx) > 5) setHasDragged(true);
-  };
-
-  const handleTouchEnd = () => {
-    setIsDragging(false);
-  };
-
-  if (categories.length === 0) return null;
-
-  // In RTL: left-side arrow scrolls left (shows next), right-side arrow scrolls right (shows previous)
-  // In LTR: left-side arrow scrolls left (shows previous), right-side arrow scrolls right (shows next)
-  const LeftSideIcon = isRTL ? ChevronRight : ChevronLeft;
-  const RightSideIcon = isRTL ? ChevronLeft : ChevronRight;
-
-  return (
-    <div className="relative">
-      {/* Left-side Arrow */}
-      {showLeftArrow && (
-        <button
-          onClick={() => scroll('left')}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center hover:bg-white hover:scale-110 transition-all"
-        >
-          <LeftSideIcon className="w-6 h-6 text-neutral-700" />
-        </button>
-      )}
-
-      {/* Right-side Arrow */}
-      {showRightArrow && (
-        <button
-          onClick={() => scroll('right')}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center hover:bg-white hover:scale-110 transition-all"
-        >
-          <RightSideIcon className="w-6 h-6 text-neutral-700" />
-        </button>
-      )}
-
-      {/* Tabs Container with drag scroll */}
-      <div 
-        ref={scrollRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        className="flex flex-row gap-3 md:gap-4 overflow-x-auto no-scrollbar items-end -mb-px scroll-smooth px-12 cursor-grab active:cursor-grabbing select-none"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-      >
-        {categories.map((category) => (
-          <button
-            key={category.id}
-            onClick={() => { if (!hasDragged) setActiveTab(category.id); }}
-            className={`
-              group text-left px-5 md:px-8 py-4 md:py-6 rounded-t-2xl min-w-[180px] md:min-w-[260px] flex-shrink-0 transition-all duration-200 relative
-              ${activeTab === category.id 
-                ? 'bg-[#F9FAFB] shadow-lg text-black z-10' 
-                : 'bg-white/10 hover:bg-white/20 text-white z-0'
-              }
-            `}
-          >
-            <h3 className={`text-base md:text-xl font-medium mb-1 ${activeTab === category.id ? 'text-black' : 'text-white'}`}>
-              {category.title}
-            </h3>
-            <p className={`text-xs md:text-sm leading-snug line-clamp-2 ${activeTab === category.id ? 'text-neutral-600' : 'text-white/70'}`}>
-              {category.description}
-            </p>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// =============================================================================
-// LOADING SKELETON
-// =============================================================================
-
-const LoadingSkeleton: React.FC = () => (
-  <div className="min-h-screen w-full bg-white">
-    <div className="w-full bg-amber-500 h-[350px] animate-pulse" />
-    <div className="px-4 md:px-16 py-12 bg-neutral-50">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-          <div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse">
-            <div className="aspect-square bg-neutral-200" />
-            <div className="p-5">
-              <div className="h-5 w-3/4 bg-neutral-200 rounded mb-2" />
-              <div className="h-4 w-1/2 bg-neutral-200 rounded" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
-// =============================================================================
-// NOT FOUND STATE
-// =============================================================================
-
-const NotFound: React.FC = () => (
-  <div className="min-h-[60vh] flex items-center justify-center">
-    <div className="text-center">
-      <h1 className="text-4xl font-medium text-neutral-900 mb-4">Subservice Not Found</h1>
-      <p className="text-neutral-600 mb-8">The subservice you're looking for doesn't exist.</p>
-      <Link to="/" className="px-6 py-3 bg-brand text-white rounded-lg hover:bg-brand/90 transition-colors">
-        Back to Home
-      </Link>
-    </div>
-  </div>
-);
-
-// =============================================================================
-// MAIN SUBSERVICE PAGE COMPONENT
-// =============================================================================
-
-export const SubservicePage: React.FC = () => {
-  const { subserviceSlug } = useParams<{ subserviceSlug: string }>();
+const CatalogView: React.FC<CatalogViewProps> = ({ subservice, service, categories, products }) => {
   const navigate = useNavigate();
-  
-  const [service, setService] = useState<Service | null>(null);
-  const [subservice, setSubservice] = useState<Subservice | null>(null);
-  const [categories, setCategories] = useState<ProductCategory[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [activeTab, setActiveTab] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
+  const { i18n } = useTranslation();
+  const hero = getHeroColors(service?.orderType, service?.brand);
+  const t = getOrderTypeConfig(service?.orderType);
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!subserviceSlug) return;
-      
-      setIsLoading(true);
-      const data = await getSubservicePageData(subserviceSlug);
-      
-      if (data) {
-        setService(data.service);
-        setSubservice(data.subservice);
-        setCategories(data.categories);
-        setProducts(data.products);
-        
-        if (data.categories.length > 0) {
-          setActiveTab(data.categories[0].id);
-        }
-      }
-      
-      setIsLoading(false);
-    };
-    
-    loadData();
-    window.scrollTo(0, 0);
-  }, [subserviceSlug]);
-
-  const handleProductClick = (product: Product) => {
-    navigate(ROUTES.PRODUCT(product.slug));
-  };
+  const [activeTab, setActiveTab] = useState(categories[0]?.id || '');
+  const tabsRef = useRef<HTMLDivElement>(null);
 
   const filteredProducts = products.filter(p => p.categoryId === activeTab);
+  const activeCategory = categories.find(c => c.id === activeTab);
 
-  if (isLoading) return <LoadingSkeleton />;
-  if (!subservice || !service) return <NotFound />;
-
-  const accentColor = service.accentColor || '#D48F28';
+  const scrollTabs = (dir: 'l' | 'r') => {
+    if (!tabsRef.current) return;
+    tabsRef.current.scrollBy({ left: dir === 'r' ? 180 : -180, behavior: 'smooth' });
+  };
 
   return (
-    <div className="w-full flex flex-col bg-white">
-      {/* Top Section with Accent Background */}
-      <div className="w-full pt-6 flex flex-col" style={{ backgroundColor: accentColor }}>
-        <div className="w-full max-w-[1920px] mx-auto px-4 md:px-12 lg:px-16">
-          
-          {/* Breadcrumbs */}
-          <div className="text-white text-[10px] md:text-xs font-medium tracking-wide uppercase mb-4 flex items-center gap-2 pl-2 flex-wrap">
-            <Link to="/" className="cursor-pointer hover:opacity-80">Home</Link>
-            <span>/</span>
-            <span>Services</span>
-            <span>/</span>
-            <Link to={ROUTES.SERVICE(service.slug)} className="cursor-pointer hover:opacity-80">{service.title}</Link>
-            <span>/</span>
-            <span>{subservice.title}</span>
+    <div>
+      {/* Hero + tabs */}
+      <section style={{ background: `linear-gradient(135deg, ${hero.heroFrom}, ${hero.heroTo})`, paddingBottom: 0, color: '#fff', position: 'relative', overflow: 'hidden' }}>
+        <Stripes opacity={0.16} />
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '56px 32px 0', position: 'relative', zIndex: 2 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 48, alignItems: 'center', paddingBottom: 56 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <OrderTypeTag orderType={service?.orderType} brand={service?.brand} variant="overlay" />
+              </div>
+              <h1 style={{ fontSize: 64, fontWeight: 600, letterSpacing: '-.025em', lineHeight: 1.05, margin: '0 0 16px', fontFamily: "'Inter Display', Inter, sans-serif" }}>
+                {subservice.title}
+              </h1>
+              <p style={{ fontSize: 16, color: 'rgba(255,255,255,.78)', fontWeight: 300, lineHeight: 1.6, margin: '0 0 20px', maxWidth: 520 }}>
+                {subservice.description}
+              </p>
+              <div style={{ display: 'flex', gap: 24, color: 'rgba(255,255,255,.7)', fontSize: 12, letterSpacing: '.05em' }}>
+                <span>{products.length} SKUs</span>
+                <span>·</span>
+                <span>MDF / Egger · configurable</span>
+              </div>
+            </div>
+            <div style={{ position: 'relative', height: 280, borderRadius: 20, overflow: 'hidden', background: 'rgba(255,255,255,.05)' }}>
+              {subservice.heroImageUrl && <img src={subservice.heroImageUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+              <span style={{ position: 'absolute', top: 14, left: 14, padding: '6px 12px', borderRadius: 99, background: 'rgba(255,255,255,.18)', backdropFilter: 'blur(10px)', color: '#fff', fontSize: 11, fontWeight: 700, letterSpacing: '.15em', textTransform: 'uppercase' }}>
+                3D · drag to rotate
+              </span>
+            </div>
           </div>
 
-          {/* Dark Hero Card */}
-          <ScrollReveal animation="fade-up" duration={800}>
-            <div className="w-full relative rounded-[2rem] md:rounded-[2.5rem] lg:rounded-[3rem] overflow-hidden bg-black text-white h-[160px] md:h-[220px] shadow-xl mb-8">
-              <div className="absolute inset-0">
-                <img 
-                  src={subservice.heroImageUrl || subservice.imageUrl || 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=1600&h=900&fit=crop'}
-                  alt={subservice.title}
-                  className="w-full h-full object-cover object-center opacity-50"
-                  onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=1600&h=900&fit=crop'; }}
+          {/* Category tabs */}
+          {categories.length > 0 && (
+            <div style={{ background: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: '8px 8px 0', display: 'flex', alignItems: 'stretch', gap: 4 }}>
+              <button onClick={() => scrollTabs('l')} style={{ width: 36, height: 36, borderRadius: 99, background: '#f5f5f5', border: 0, color: '#525252', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, alignSelf: 'center', marginRight: 4 }}>
+                <ChevronLeft size={14} />
+              </button>
+              <div ref={tabsRef} className="no-scrollbar" style={{ display: 'flex', gap: 4, overflowX: 'auto', flex: 1 }}>
+                {categories.map((cat) => {
+                  const isActive = cat.id === activeTab;
+                  return (
+                    <button key={cat.id} onClick={() => setActiveTab(cat.id)} style={{ flexShrink: 0, padding: '16px 20px', borderRadius: '12px 12px 0 0', border: 0, background: isActive ? '#fff' : 'transparent', color: isActive ? '#0a0a0a' : '#737373', fontFamily: 'inherit', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 2, borderBottom: `2px solid ${isActive ? t.accent : 'transparent'}` }}>
+                      <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: isActive ? t.tagFg : '#a3a3a3' }}>{cat.slug.toUpperCase()}</span>
+                      <span style={{ fontSize: 14, fontWeight: isActive ? 700 : 500 }}>{cat.title}</span>
+                      <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: '#a3a3a3' }}>{products.filter(p => p.categoryId === cat.id).length} items</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={() => scrollTabs('r')} style={{ width: 36, height: 36, borderRadius: 99, background: '#f5f5f5', border: 0, color: '#525252', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, alignSelf: 'center', marginLeft: 4 }}>
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Product grid */}
+      <section style={{ padding: '48px 32px 96px', background: '#fafaf8' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+          {activeCategory && (
+            <div style={{ marginBottom: 32 }}>
+              <h2 style={{ fontSize: 28, fontWeight: 600, color: '#0a0a0a', fontFamily: "'Inter Display', Inter, sans-serif", margin: 0 }}>{activeCategory.title}</h2>
+              {activeCategory.description && <p style={{ fontSize: 15, color: '#737373', margin: '8px 0 0', fontWeight: 300 }}>{activeCategory.description}</p>}
+            </div>
+          )}
+          {filteredProducts.length === 0 ? (
+            <div style={{ padding: '64px 0', textAlign: 'center', color: '#a3a3a3' }}>No products in this category.</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 20 }}>
+              {filteredProducts.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  accent={t.accent}
+                  tagBg={t.tagBg}
+                  tagFg={t.tagFg}
+                  onClick={() => navigate(ROUTES.PRODUCT(p.slug))}
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent" />
-              </div>
-
-              <div className="absolute inset-0 flex flex-col justify-center px-6 md:px-16 max-w-4xl">
-                <h1 className="text-2xl md:text-5xl font-normal tracking-tight mb-2">{subservice.title}</h1>
-                <p className="text-neutral-300 text-sm md:text-lg font-light leading-relaxed max-w-2xl line-clamp-2">{subservice.description}</p>
-              </div>
-            </div>
-          </ScrollReveal>
-
-          {/* Category Tabs with Navigation Arrows */}
-          <CategoryTabs 
-            categories={categories}
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-          />
-        </div>
-      </div>
-
-      {/* Content Area */}
-      <div className="flex-1 bg-[#F9FAFB] min-h-[600px]">
-        <div className="max-w-[1920px] mx-auto px-4 md:px-12 lg:px-16 py-8 md:py-12">
-          
-          {/* Products Grid */}
-          <StaggerReveal 
-            animation="fade-up" 
-            staggerDelay={80}
-            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6"
-          >
-            {filteredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} onClick={() => handleProductClick(product)} />
-            ))}
-          </StaggerReveal>
-
-          {/* Empty state */}
-          {filteredProducts.length === 0 && categories.length > 0 && (
-            <div className="text-center py-20 text-neutral-500">
-              <p className="text-lg mb-2">No products found in this category.</p>
-              <p className="text-sm">Products will appear here once added via Admin Panel.</p>
-            </div>
-          )}
-
-          {/* No categories state */}
-          {categories.length === 0 && (
-            <div className="text-center py-20 text-neutral-500">
-              <p className="text-lg">No product categories available yet.</p>
+              ))}
             </div>
           )}
         </div>
+      </section>
+
+      {/* Sticky CTA bar */}
+      <div style={{ position: 'sticky', bottom: 0, zIndex: 20, background: 'rgba(255,255,255,.96)', backdropFilter: 'blur(12px)', borderTop: `1px solid ${t.accent}40`, padding: '14px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, boxShadow: '0 -8px 30px -10px rgba(0,0,0,.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 99, background: t.accent }} />
+          <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: '#737373' }}>Browsing:</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: '#0a0a0a' }}>{subservice.title}</span>
+        </div>
+        <Link
+          to={ROUTES.QUOTE}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '12px 20px', borderRadius: 999, background: BRAND_NEUTRAL, color: '#fff', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}
+        >
+          Get a quote <ArrowRight size={14} />
+        </Link>
       </div>
+    </div>
+  );
+};
+
+// ── LEAD FORM VIEW (project / custom order) ───────────────────────────────────
+interface LeadFormViewProps {
+  subservice: Subservice;
+  service: Service | null;
+}
+
+const LeadFormView: React.FC<LeadFormViewProps> = ({ subservice, service }) => {
+  const navigate = useNavigate();
+  const { i18n } = useTranslation();
+  const hero = getHeroColors(service?.orderType, service?.brand);
+  const t = getOrderTypeConfig(service?.orderType);
+  const isProject = service?.orderType === 'send-file-and-process';
+
+  const [files, setFiles] = useState<File[]>([]);
+  const [form, setForm] = useState({ name: '', phone: '', company: '', message: '', material: 'MDF 18mm', deadline: 'Within 1 wk', objectType: 'Custom kitchen', timeline: '1–2 months' });
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) setFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+  };
+  const removeFile = (i: number) => setFiles(prev => prev.filter((_, j) => j !== i));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await submitQuoteRequest({ ...form, serviceSlug: service?.slug, subserviceSlug: subservice.slug, orderType: service?.orderType } as any);
+      navigate(`/thank-you/${service?.orderType?.replace(/-/g, '-') || 'project'}`);
+    } catch {
+      setSubmitting(false);
+    }
+  };
+
+  const chipOpts = (opts: string[], value: string, field: keyof typeof form) => (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {opts.map(o => (
+        <button key={o} type="button" onClick={() => setForm(prev => ({ ...prev, [field]: o }))} style={{ padding: '10px 14px', borderRadius: 99, fontFamily: 'inherit', border: form[field] === o ? `1.5px solid ${t.accent}` : '1px solid #e0e0e0', background: form[field] === o ? t.tagBg : '#fff', color: form[field] === o ? t.tagFg : '#262626', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+          {o}
+        </button>
+      ))}
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Hero */}
+      <section style={{ background: `linear-gradient(135deg, ${hero.heroFrom}, ${hero.heroTo})`, padding: '72px 32px 96px', color: '#fff', position: 'relative', overflow: 'hidden' }}>
+        <Stripes opacity={0.16} />
+        <div style={{ maxWidth: 1280, margin: '0 auto', position: 'relative', zIndex: 2, display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 64, alignItems: 'center' }}>
+          <div>
+            <div style={{ marginBottom: 16 }}><OrderTypeTag orderType={service?.orderType} brand={service?.brand} variant="overlay" /></div>
+            <h1 style={{ fontSize: 72, fontWeight: 600, letterSpacing: '-.025em', lineHeight: 1.05, margin: '0 0 18px', fontFamily: "'Inter Display', Inter, sans-serif" }}>
+              {isProject ? 'Send us the file.' : 'Tell us the brief.'}
+            </h1>
+            <p style={{ fontSize: 17, color: 'rgba(255,255,255,.78)', fontWeight: 300, lineHeight: 1.55, margin: '0 0 28px', maxWidth: 520 }}>
+              {isProject
+                ? 'Drop your DXF, DWG, PDF, or sketch. We come back with a cost and lead time within 1 business day.'
+                : 'From idea to installed kitchen. Share what you have — sketches, photos, or just a feeling.'}
+            </p>
+            <div style={{ display: 'flex', gap: 24, color: 'rgba(255,255,255,.7)', fontSize: 12.5 }}>
+              {['Reply within 1 business day', 'Free quote · no commitment', 'EN / HE'].map((item, i) => (
+                <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: t.accent }}><Check size={14} /></span>{item}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div style={{ height: 280, borderRadius: 20, overflow: 'hidden', background: 'rgba(255,255,255,.05)' }}>
+            {subservice.heroImageUrl && <img src={subservice.heroImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+          </div>
+        </div>
+      </section>
+
+      {/* Form + sidebar */}
+      <section style={{ background: '#fafaf8', padding: '0 32px 96px', marginTop: -40, position: 'relative', zIndex: 3 }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 32 }}>
+          {/* Form card */}
+          <form onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 20, padding: 40, boxShadow: '0 12px 40px -16px rgba(0,0,0,.12)', display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <div>
+              <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: t.tagFg }}>Step 1 of 2</span>
+              <h2 style={{ fontSize: 28, fontWeight: 600, letterSpacing: '-.018em', color: '#0a0a0a', margin: '8px 0 4px', fontFamily: "'Inter Display', Inter, sans-serif" }}>
+                {isProject ? 'Files & specifications' : 'Project brief'}
+              </h2>
+              <p style={{ fontSize: 13.5, color: '#737373', margin: 0, fontWeight: 300 }}>
+                {isProject ? 'The more we know, the more accurate the quote.' : 'Don\'t worry about getting it perfect. We\'ll talk through the details.'}
+              </p>
+            </div>
+
+            {/* File upload (project) */}
+            {isProject ? (
+              <>
+                <div style={{ background: '#fff', borderRadius: 16, border: `2px dashed ${t.accent}`, padding: '44px 32px', textAlign: 'center', position: 'relative' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: 99, background: t.tagBg, color: t.tagFg, marginBottom: 16 }}>
+                    <Upload size={24} />
+                  </div>
+                  <h3 style={{ fontSize: 22, fontWeight: 600, color: '#0a0a0a', margin: '0 0 6px', fontFamily: "'Inter Display', Inter, sans-serif" }}>Drop your files here</h3>
+                  <p style={{ fontSize: 13.5, color: '#525252', margin: '0 0 16px', fontWeight: 300 }}>DXF · DWG · PDF · STEP · up to 50 MB per file</p>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 20px', borderRadius: 99, background: BRAND_NEUTRAL, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                    <input type="file" multiple accept=".dxf,.dwg,.pdf,.step,.stp,.xlsx,.xls" onChange={handleFile} style={{ display: 'none' }} />
+                    Choose files
+                  </label>
+                </div>
+                {files.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {files.map((f, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', borderRadius: 10, padding: '12px 16px', border: '1px solid #efefef' }}>
+                        <span style={{ width: 32, height: 32, borderRadius: 6, background: t.tagBg, color: t.tagFg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FileText size={15} /></span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#0a0a0a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                          <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10.5, color: '#a3a3a3' }}>{(f.size / 1024).toFixed(0)} KB</span>
+                        </div>
+                        <button type="button" onClick={() => removeFile(i)} style={{ background: 'transparent', border: 0, cursor: 'pointer', color: '#a3a3a3' }}><X size={15} /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: '#262626' }}>Material</span>
+                    {chipOpts(['MDF 18mm', 'MDF 16mm', 'Egger', 'Plywood', 'Other'], form.material, 'material')}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: '#262626' }}>Deadline</span>
+                    {chipOpts(['ASAP', 'Within 1 wk', '2–3 wks', 'Flexible'], form.deadline, 'deadline')}
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Custom order brief */
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: '#262626' }}>What are we building?</span>
+                  {chipOpts(['Custom kitchen', 'Cabinetry · wardrobe', 'Office fit-out', 'Retail interior', 'Other'], form.objectType, 'objectType')}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: '#262626' }}>Timeline</span>
+                    {chipOpts(['ASAP', '1–2 mo', '3–6 mo', 'Just exploring'], form.timeline, 'timeline')}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Notes */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: '#262626' }}>Additional notes</span>
+              <textarea value={form.message} onChange={e => setForm(p => ({ ...p, message: e.target.value }))} placeholder={isProject ? 'Special tolerances, finish notes, delivery constraints…' : 'Site address, who lives there, what\'s working and what isn\'t…'} rows={4}
+                style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: 14, fontFamily: 'inherit', color: '#0a0a0a', resize: 'vertical', outline: 'none' }}
+              />
+            </div>
+
+            {/* Contact */}
+            <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: '#262626' }}>Step 2 · how to reach you</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                {[{ f: 'name' as const, pl: 'Your name *' }, { f: 'company' as const, pl: 'Company (optional)' }].map(({ f, pl }) => (
+                  <input key={f} value={form[f]} onChange={e => setForm(p => ({ ...p, [f]: e.target.value }))} placeholder={pl} required={f === 'name'}
+                    style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: 14, fontFamily: 'inherit', color: '#0a0a0a', outline: 'none' }} />
+                ))}
+              </div>
+              <input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="+972 …" required
+                style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: 14, fontFamily: 'inherit', color: '#0a0a0a', outline: 'none' }} />
+            </div>
+
+            {/* Submit */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginTop: 6 }}>
+              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: '#a3a3a3' }}>By submitting, you agree to our privacy terms.</span>
+              <button type="submit" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 24px', borderRadius: 999, background: BRAND_NEUTRAL, color: '#fff', fontSize: 13, fontWeight: 700, cursor: submitting ? 'wait' : 'pointer', border: 0, fontFamily: 'inherit' }}>
+                {submitting ? 'Sending…' : isProject ? 'Send for review' : 'Send brief'} <ArrowRight size={14} />
+              </button>
+            </div>
+          </form>
+
+          {/* Sidebar */}
+          <aside style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingTop: 40 }}>
+            {/* What happens next */}
+            <div style={{ background: `linear-gradient(135deg, ${hero.heroFrom}10, transparent)`, border: `1px solid ${t.accent}40`, borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: t.tagFg }}>What happens next</span>
+              {(isProject ? [
+                ['01', 'We open your files', 'Engineer checks DXF / sheet count / material in CAM.'],
+                ['02', 'Quote in your inbox', 'Itemised price, lead time, options. Within 1 business day.'],
+                ['03', 'You approve, we cut', 'Production starts. Track status in your account.'],
+              ] : [
+                ['01', 'Designer reads your brief', 'We map what you sent to a starting concept.'],
+                ['02', 'Free 30-min call', 'We talk through scope, budget, timeline. No commitment.'],
+                ['03', 'Concept + costed plan', 'You decide whether we build it. Free up to that point.'],
+              ]).map(([n, l, sub]) => (
+                <div key={n} style={{ display: 'flex', gap: 14 }}>
+                  <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, fontWeight: 700, color: t.tagFg, paddingTop: 2 }}>{n}</span>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#0a0a0a', marginBottom: 2 }}>{l}</div>
+                    <span style={{ fontSize: 12.5, color: '#525252', lineHeight: 1.5, fontWeight: 300 }}>{sub}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Talk first card */}
+            <div style={{ background: '#0a0a0a', borderRadius: 16, padding: 24, color: '#fff', display: 'flex', flexDirection: 'column', gap: 12, position: 'relative', overflow: 'hidden' }}>
+              <Stripes opacity={0.18} />
+              <div style={{ position: 'relative', zIndex: 2 }}>
+                <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: t.accent }}>Prefer to talk first?</span>
+                <h3 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-.015em', margin: '10px 0 14px', lineHeight: 1.2, fontFamily: "'Inter Display', Inter, sans-serif" }}>
+                  Book a 30-min call with an engineer.
+                </h3>
+                <a href="https://wa.me/972501234567" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 18px', borderRadius: 99, background: '#25D366', color: '#fff', border: 0, fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none' }}>
+                  WhatsApp · +972 50 890-0000
+                </a>
+              </div>
+            </div>
+
+            {/* Trust mini */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {[['180+', 'kitchens / yr'], ['72 h', 'avg. lead time']].map(([k, v]) => (
+                <div key={k} style={{ background: '#fff', borderRadius: 12, padding: '16px 18px', border: '1px solid #f0f0f0' }}>
+                  <span style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-.02em', color: '#0a0a0a', display: 'block', fontFamily: "'Inter Display', Inter, sans-serif" }}>{k}</span>
+                  <span style={{ fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: 700, color: '#737373', display: 'block', marginTop: 4 }}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </aside>
+        </div>
+      </section>
+    </div>
+  );
+};
+
+// ── SUBSERVICE PAGE (main export) ─────────────────────────────────────────────
+export const SubservicePage: React.FC = () => {
+  const { subserviceSlug } = useParams<{ subserviceSlug: string }>();
+  const { i18n } = useTranslation();
+  const lang = i18n.language?.startsWith('he') ? 'he' : 'en';
+
+  const [subservice, setSubservice] = useState<Subservice | null>(null);
+  const [service, setService] = useState<Service | null>(null);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!subserviceSlug) return;
+    getSubservicePageData(subserviceSlug).then(data => {
+      if (data) {
+        setSubservice(data.subservice);
+        setService(data.service || null);
+        setCategories(data.categories || []);
+        setProducts(data.products || []);
+        if (data.service?.orderType) sessionStorage.setItem('hw_active_order_type', data.service.orderType);
+      }
+    }).finally(() => setLoading(false));
+  }, [subserviceSlug]);
+
+  if (loading) return (
+    <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 40, height: 40, borderRadius: 99, border: `3px solid #e5e5e5`, borderTopColor: BRAND_NEUTRAL, animation: 'spin .7s linear infinite' }} />
+    </div>
+  );
+  if (!subservice) return <div style={{ padding: '96px 32px', textAlign: 'center', color: '#737373' }}>Subservice not found.</div>;
+
+  const orderType = service?.orderType;
+  const t = getOrderTypeConfig(orderType);
+
+  const breadcrumbItems = [
+    { label: 'Home', href: '/' },
+    { label: 'Services', href: '#' },
+    ...(service ? [{ label: service.title, href: ROUTES.SERVICE(service.slug) }] : []),
+    { label: subservice.title },
+  ];
+
+  return (
+    <div style={{ background: '#fff' }}>
+      <Breadcrumb items={breadcrumbItems} orderType={orderType} />
+
+      {/* Conditional view based on order type */}
+      {orderType === 'browse-and-order' ? (
+        <CatalogView subservice={subservice} service={service} categories={categories} products={products} />
+      ) : (
+        <LeadFormView subservice={subservice} service={service} />
+      )}
+
+      {/* Journey section only for non-form views */}
+      {orderType === 'browse-and-order' && (
+        <HowItWorks orderType={orderType} />
+      )}
     </div>
   );
 };

@@ -22,6 +22,10 @@ import { AboutPage } from './pages/AboutPage';
 import { ContactPage } from './pages/ContactPage';
 import { PortfolioPage } from './pages/PortfolioPage';
 import { StoryPage } from './pages/StoryPage';
+import { PrivacyPage } from './pages/PrivacyPage';
+import { TermsPage } from './pages/TermsPage';
+import { CookiesPage } from './pages/CookiesPage';
+import { ThankYouPage } from './pages/ThankYouPage';
 
 // Admin Pages
 import { AdminLayout } from './admin/AdminLayout';
@@ -36,6 +40,7 @@ import { AdminMainPage } from './admin/pages/AdminMainPage';
 import { AdminCompanyInfo } from './admin/pages/AdminCompanyInfo';
 import { AdminSubmissions } from './admin/pages/AdminSubmissions';
 import { AdminPartners } from './admin/pages/AdminPartners';
+import { AdminHeroSlides } from './admin/pages/AdminHeroSlides';
 
 // Error boundary
 const ErrorPage = () => (
@@ -70,6 +75,10 @@ const routes: RouteObject[] = [
       { path: 'contact', element: <ContactPage /> },
       { path: 'portfolio', element: <PortfolioPage /> },
       { path: 'stories/:storySlug', element: <StoryPage /> },
+      { path: 'privacy', element: <PrivacyPage /> },
+      { path: 'terms', element: <TermsPage /> },
+      { path: 'cookies', element: <CookiesPage /> },
+      { path: 'thank-you/:orderType', element: <ThankYouPage /> },
     ],
   },
   // Admin Routes
@@ -91,6 +100,7 @@ const routes: RouteObject[] = [
       { path: 'partners', element: <AdminPartners /> },
       { path: 'company-info', element: <AdminCompanyInfo /> },
       { path: 'submissions', element: <AdminSubmissions /> },
+      { path: 'hero-slides', element: <AdminHeroSlides /> },
     ],
   },
 ];
@@ -121,4 +131,9 @@ export const ROUTES = {
   ADMIN_PARTNERS: '/admin/partners',
   ADMIN_COMPANY_INFO: '/admin/company-info',
   ADMIN_SUBMISSIONS: '/admin/submissions',
+  // Legal pages
+  PRIVACY: '/privacy',
+  TERMS: '/terms',
+  COOKIES: '/cookies',
+  THANK_YOU: (orderType: string) => `/thank-you/${orderType}`,
 } as const;
